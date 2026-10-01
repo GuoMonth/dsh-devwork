@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: node scripts/check-release.mjs "$GITHUB_REF_NAME"
+      - run: node scripts/check-release.mts "$GITHUB_REF_NAME"
       - run: npm ci
       - run: npm run verify
       - run: npm run pack:check

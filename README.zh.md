@@ -17,7 +17,7 @@
 
 ## 开发与试装
 
-兼容基线：DSH **0.2.0-rc.2**，Cordis **4.0.4**。使用 Node.js 22.19+ 或 24+；CI 检查 Node 22 和 24。
+兼容基线：DSH **0.2.0-rc.2**，Cordis **4.0.4**。仅支持 **Node.js 24.x**，不锁定小版本和补丁版本；CI 与发布流程统一使用 Node 24。源码和开发脚本均采用**严格 TypeScript 7.0.2**，并启用索引访问与可选属性的额外检查。
 
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git

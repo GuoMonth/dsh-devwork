@@ -17,7 +17,7 @@ The first phase focuses on local desktop development. Remote execution, mobile c
 
 ## Develop and try the bundle
 
-Baseline: DSH **0.2.0-rc.2**, Cordis **4.0.4**. Use Node.js 22.19+ or 24+; CI checks Node 22 and 24.
+Baseline: DSH **0.2.0-rc.2**, Cordis **4.0.4**. Use **Node.js 24.x only**; the minor/patch version is not fixed. CI and releases use Node 24. All source and development scripts use **strict TypeScript 7.0.2**, with unchecked indexed access and exact optional property checks enabled.
 
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git

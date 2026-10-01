@@ -1,6 +1,8 @@
 # Project instructions
 
 - Build DSH Devwork as a local desktop developer experience on DSH's public plugin APIs.
+- Support Node.js 24.x only. Do not add other Node major versions or a compatibility matrix.
+- Use strict TypeScript 7 for all first-party code, including scripts. Validate external data from unknown; do not bypass checks with explicit any, blanket casts, or suppression comments. Favor clear types over elaborate type-level machinery.
 - Absorb Orca's engineering and interaction lessons; do not copy Orca source or depend on its runtime/services.
 - Preserve one primary Leader conversation. Favor a small useful coding/review flow over a general orchestration platform.
 - Remote execution, mobile, email, and automatic crash recovery are outside the first phase.
