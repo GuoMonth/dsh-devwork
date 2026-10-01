@@ -1,10 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { Devwork } from './service.js'
 
 export const name = 'dsh-devwork'
+export const inject = ['agents', 'agentTeams', 'tools', 'systemPrompt', 'workspaceChanges']
+export { Devwork }
+export type * from './types.js'
 
 /**
- * Minimal Cordis entry for the initial bundle scaffold.
- * Product capabilities will be added through public DSH services and UI slots.
- * This version intentionally registers no tools, prompts, or UI.
+ * Host feature whose dependencies and resources are owned by Cordis.
  */
-export function apply(_ctx: Context): void {}
+export function apply(ctx: Context): void { ctx.plugin(Devwork) }
