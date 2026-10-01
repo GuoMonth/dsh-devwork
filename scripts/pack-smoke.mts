@@ -22,7 +22,8 @@ try {
   execFileSync('tar', ['-xzf', join(temporary, filename), '-C', temporary])
   const pkg = record(parseJson(readFileSync(join(temporary, 'package/package.json'), 'utf8')))
   // Install the tarball as a real consumer dependency; shared APIs resolve as peers.
-  execFileSync('npm', ['install', join(temporary, filename), '--omit=dev', '--offline', '--no-audit', '--no-fund'], { cwd: temporary, stdio: ['ignore', 'pipe', 'inherit'] })
+  // Peer resolution needs registry metadata even when npm ci cached tarballs.
+  execFileSync('npm', ['install', join(temporary, filename), '--omit=dev', '--no-audit', '--no-fund'], { cwd: temporary, stdio: ['ignore', 'pipe', 'inherit'] })
   const entry = record(await import(pathToFileURL(join(temporary, 'node_modules', string(pkg.name), string(pkg.main))).href))
   assert.equal(entry.name, 'dsh-devwork')
   assert.equal(typeof entry.apply, 'function')
