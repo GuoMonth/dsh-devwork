@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
@@ -82,10 +82,19 @@ export async function until(predicate: () => boolean, message: string): Promise<
 export async function boot(options: { plugin?: boolean; changes?: boolean } = {}) {
   const cwd = await mkdtemp(join(tmpdir(), 'devwork-headless-'))
   const ctx = new Context()
+  const logs: string[] = []
+  ctx.logger.exporter({ levels: { default: 3 }, export: message => { if (message.type !== 'debug') logs.push(message.args.map(String).join(' ')) } })
   try {
     const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Devwork POC', '-c', 'user.email=poc@example.invalid', '-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8' })
     git('init', '-q', '-b', 'main')
     await writeFile(join(cwd, 'math.ts'), INITIAL)
+    // Model an existing repository, not a just-indexed same-second file.
+    // Fresh equal-size writes expose rc.2's private-index timestamp issue (#7).
+    // Keep an explicit diagnostic mode; do not hide it behind test retries.
+    if (process.env.DEVWORK_POC_FRESH_BASELINE !== '1') {
+      const old = new Date('2000-01-01T00:00:00Z')
+      await utimes(join(cwd, 'math.ts'), old, old)
+    }
     await writeFile(join(cwd, 'check.ts'), "import assert from 'node:assert/strict'\nimport { add } from './math.ts'\nassert.equal(add(2, 3), 5)\nassert.equal(add(-2, 2), 0)\nconsole.log('acceptance passed')\n")
     await writeFile(join(cwd, 'README.md'), 'User-owned notes.\n')
     await writeFile(join(cwd, '.gitignore'), '.sessions/\n')
@@ -109,7 +118,7 @@ export async function boot(options: { plugin?: boolean; changes?: boolean } = {}
     const model = new ScriptedModel()
     ctx.llm.registerAdapter(['poc'], model)
     const lead = await ctx.agentLoop.create(SessionId(`poc-lead-${Date.now()}`), { provider: 'poc', model: 'deterministic' }, { cwd })
-    return { ctx, cwd, lead, model, teamFiber, changesFiber, pluginFiber,
+    return { ctx, cwd, lead, model, teamFiber, changesFiber, pluginFiber, logs,
       async close() { await ctx.fiber.dispose(); await rm(cwd, { recursive: true, force: true }) } }
   } catch (error) { await ctx.fiber.dispose(); await rm(cwd, { recursive: true, force: true }); throw error }
 }

@@ -15,7 +15,7 @@ A desktop development workspace built on [DeepSeek Harness](https://github.com/d
 
 The first phase focuses on local desktop development. Remote execution, mobile clients, email, and automatic crash recovery are deferred.
 
-The [headless POC assessment](docs/headless-poc.md) records the implementation, lifecycle findings, results and blockers. We reuse official tasks and members, gate delivery on current acceptance evidence, and send several diff comments as one follow-up to the same Leader. The UI currently provides an editable start request; a result/feedback surface remains to be built. See also the earlier [phase-one assessment](docs/phase-one.md).
+The [headless POC assessment](docs/headless-poc.md) records the implementation, lifecycle findings, results and blockers. We reuse official tasks and members, gate delivery on current acceptance evidence, and send several diff comments as one follow-up to the same Leader. Temporary task worktrees now support a [committed Leader handoff and cleanup](docs/task-delivery.md). The UI currently provides an editable start request; a result/feedback surface remains to be built. See also the earlier [phase-one assessment](docs/phase-one.md).
 
 ## Develop and try the bundle
 
@@ -40,6 +40,8 @@ dsh --profile devwork-demo --dump-config
 The output should include the Devwork bundle layer and the `guomonth-devwork` row. This CLI profile is an installation check, not a separate desktop application.
 
 The test suite checks Host behavior and Client registration/insertion without a browser. The real-model and native desktop acceptance checks remain open. DSH rc.2 has a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
+
+Same-second equal-size official snapshot misses are tracked in [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7); the existing-repository test baseline is not a production fix.
 
 ## Package and release
 

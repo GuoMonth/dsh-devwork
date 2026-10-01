@@ -20,6 +20,8 @@ export interface DevelopmentBrief {
   total: number
   checks: CheckEvidence[]
   attention: string[]
+  /** Temporary task checkouts still awaiting a committed handoff/cleanup. */
+  cleanupPending: string[]
 }
 export interface ReviewSnapshot {
   roundId: string
@@ -41,4 +43,25 @@ export interface FeedbackBatch {
   seq: number
   fingerprint: string
   prompt: string
+}
+export interface TaskWorktree {
+  id: string
+  roundId: string
+  taskId: string
+  path: string
+  baseCommit: string
+}
+export interface TaskHandoff {
+  worktreeId: string
+  sourceCommit: string
+  summaryPath: string
+  markdown: string
+  commitTrailers: string
+}
+export interface WorktreeReceipt {
+  worktreeId: string
+  taskId: string
+  sourceCommit: string
+  integratedCommit: string
+  summaryPath: string
 }

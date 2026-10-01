@@ -30,7 +30,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-These validate strict Host/Client/script/test types, six headless behavior scenarios, two Client boundary scenarios, exports, bundle metadata, and installing/importing the prebuilt tarball in an independent consumer. The Client uses the official closure-factory loader and public conversation slot. The exact rc.2 declaration correction is development-only, excluded from the package; see the [POC assessment](headless-poc.md). They do not prove a desktop interaction or model task works. Before an actual release, install the tarball into the target DSH desktop, enable/disable the plugin, and verify every advertised capability. Recheck compatibility whenever the DSH baseline changes.
+These validate strict Host/Client/script/test types, seven headless behavior scenarios, two Client boundary scenarios, exports, bundle metadata, and installing/importing the prebuilt tarball in an independent consumer. The Client uses the official closure-factory loader and public conversation slot. The exact rc.2 declaration correction is development-only, excluded from the package; see the [POC assessment](headless-poc.md). They do not prove a desktop interaction or model task works. Before an actual release, install the tarball into the target DSH desktop, enable/disable the plugin, and verify every advertised capability. Recheck compatibility whenever the DSH baseline changes.
 
 ## GitHub alpha release
 

@@ -5,7 +5,9 @@
 - Use strict TypeScript 7 for all first-party code, including scripts. Validate external data from unknown; do not bypass checks with explicit any, blanket casts, or suppression comments. Favor clear types over elaborate type-level machinery.
 - Absorb Orca's engineering and interaction lessons; do not copy Orca source or depend on its runtime/services.
 - Preserve one primary Leader conversation. Favor a small useful coding/review flow over a general orchestration platform.
+- Temporary task worktrees belong to the delivery lifecycle: integrate committed results, commit a concise Leader summary, verify the target checkout, then remove the owned worktree without force. Keep unfinished/unintegrated work visible; never archive checkout copies in the repository.
 - Remote execution, mobile, email, and automatic crash recovery are outside the first phase.
+- Do not hide the known fresh-index/same-second snapshot miss with retries. Keep the aged fixture baseline and diagnostic mode explicit; passing normal tests is not a production fix.
 - Do not report planned capabilities as implemented. Scripted-model integration tests do not prove autonomous planning, judgment, or real desktop rendering.
 - Shared DSH/Cordis runtime packages belong in peerDependencies and devDependencies; do not bundle another instance.
 - Use dependency injection for consumed services and Cordis effects for resources. Never import another feature's private UI components.

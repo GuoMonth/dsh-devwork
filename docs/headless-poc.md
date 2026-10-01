@@ -20,7 +20,7 @@ The POC reuses official Team: task CAS, dependencies, messaging, member continua
 | Keep feedback associated with code | Bind a batch to snapshot and checkout fingerprint; refuse stale feedback | Stale rejection implemented; automatic reanchoring and reply/resolve threads pending |
 | Centralize completion/attention signals | Read official tasks; summarize failed/stale checks and inactive owners with unfinished tasks | Deterministic signals implemented; business importance remains a Leader-model judgment |
 | Clear work/review boundaries | Official task contracts, explicit acceptance commands and one Leader | Mechanism implemented; real-model quality pending |
-| Isolated worktrees for parallel edits | One writer and a read-only reviewer in official shared cwd first | No worktree isolation or claim of Orca-equivalent file isolation |
+| Isolated worktrees for parallel edits | Opt-in detached task checkout; pass its path explicitly to member tools | Creation, committed handoff and cleanup tested; automatic per-member cwd and enforced isolation pending |
 
 Sources: [batch diff review](https://www.onorca.dev/docs/review/annotate-ai-diff), [notifications](https://www.onorca.dev/docs/notifications), [worktrees](https://www.onorca.dev/docs/model/worktrees). Design lessons only; no Orca source/runtime dependency.
 
@@ -35,6 +35,10 @@ Sources: [batch diff review](https://www.onorca.dev/docs/review/annotate-ai-diff
 - Client uses the public `conversation.input.left` slot, inputActions revision-protected insertion and locale/effects. Slot collapse and plugin unload remove it. No private UI imports, DOM manipulation or duplicate React.
 
 Official references: [effects](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/cordis-tutorial/02-lifecycle-and-effects.md), [injection](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/cordis-tutorial/03-services.md), [headless](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/packages/bundle/headless/README.md).
+
+## Task delivery
+
+`devwork_worktree`, `devwork_handoff`, and `devwork_cleanup` form a small optional checkout lifecycle. Leader summaries and source identity are committed; temporary checkouts are removed after verified integration. `cleanupPending` keeps unfinished cleanup visible. Details and merge-mode boundaries: [task delivery](task-delivery.md).
 
 ## Interfaces
 
@@ -55,7 +59,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-Six `tests/headless.mts` behavior scenarios cover:
+Seven `tests/headless.mts` behavior scenarios cover:
 
 1. Real AgentLoop, Team/tools, JSONL persistence, SessionQuery, Bash/subprocess and workspace-changes: writer edit, dependent read-only review, Leader acceptance, two comments in one batch, same-member revision and recheck. Root diff includes member changes and excludes an existing dirty README; stale feedback and concurrent duplicate delivery fail closed.
 2. Unload cancels/drains a running official check process.
@@ -63,6 +67,7 @@ Six `tests/headless.mts` behavior scenarios cover:
 4. Official pre-execute denial reaches nested checks.
 5. Inactive ownership is not completion or automatic release; children cannot control the Leader round.
 6. Real Cordis PENDING, activation, dependency loss/reactivation and tool/prompt cleanup.
+7. Real Team member edits/commits in an explicit temporary workdir; stale/unintegrated/missing-summary/dirty/policy-denied cleanup refuses, verified committed handoff removes only the owned checkout, concurrent/repeated cleanup is rejected, existing dirty README remains.
 
 Two `tests/client.mts` browser-free checks load the actual closure factory with official SlotRegistry, exercise declaration/collapse/redeclaration/unload, and check explicit request insertion, insertion revision and no auto-submit. The model is our deterministic script and Client locale is a boundary fixture. Business services and SlotRegistry use published official packages. Real models, a complete CLI profile and macOS/Windows desktop have not been validated.
 
@@ -76,12 +81,14 @@ The type follow-up is tracked in [development issue #4](https://github.com/GuoMo
 
 Client declarations also require explicit transitive type dependencies and public generated remote types. These are development dependencies, not browser bundle inputs. Separate Host/Client programs and retained type references keep emitted declarations self-contained without private imports.
 
+**Same-second equal-size snapshot misses.** Local traces showed changed content/timestamps but identical official before/after trees. Copied-index timestamps affecting racy-Git checks are the current hypothesis; see [development issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7). Normal fixtures use an old baseline mtime to model an existing repository and avoid creation-time collisions. This bounds the tests, not a production fix. `DEVWORK_POC_FRESH_BASELINE=1` restores the fresh baseline for diagnosis. No official runtime or user index is modified, and failures are not suppressed with retries. Missing official snapshots still block review.
+
 Remaining first-phase boundaries:
 
-- Shared checkout: no file lock, worktree or merge; writeScopes are advisory.
+- Team still inherits shared cwd. Temporary worktree leases do not change that API: member tools must use the returned path explicitly. No file lock or sandbox isolation; writeScopes remain advisory. See [task delivery](task-delivery.md).
 - Official snapshots are per turn. The API reviews the latest settled turn, not cumulative feature-wide changes across turns.
 - Rounds/evidence/batches are ephemeral for this Host/Leader lifetime. No restart recovery; an exited one-shot CLI cannot continue them.
 - Comments support a single text hunk's new-side range. Binary/oversized, old-side/deleted lines, reanchoring and unresolved threads are pending.
 - UI has an initiation entry; full feedback editor and Host/Client transport remain pending. Planning/contracts/judgment/summaries require real-model acceptance.
 
-Next: real-model loop, a small public-API result/feedback surface, then evidence-led decisions on cumulative diff, comment retention, a second writer or isolated worktrees. Email, remote execution and recovery remain deferred.
+Next: real-model loop, a small public-API result/feedback surface, then evidence-led decisions on cumulative diff, comment retention, a second writer or automatic worktree routing. Email, remote execution and recovery remain deferred.

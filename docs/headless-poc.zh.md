@@ -20,7 +20,7 @@
 | 意见随代码保持上下文 | 每批绑定快照与代码指纹；代码变化后拒绝旧反馈，让人刷新 | 已实现拒绝过期；自动重定位、回复/resolve 线程未实现 |
 | 完成与需要注意的信息集中出现 | 从官方任务读取进度；检查失败、证据过期、owner 空闲但任务未完成列入 Leader brief | 已实现确定性信号；业务问题重要性仍由 Leader 模型判断 |
 | 每个任务有清楚的工作与审查边界 | 官方任务契约 + 显式验收命令 + 一个 Leader 入口 | 已实现骨架与机制验证；真实模型质量待验收 |
-| 独立 worktree 支持并行写入 | 先一名 writer 与只读 reviewer，使用官方共享 cwd | 未实现独立 worktree；不声称拥有 Orca 的文件隔离 |
+| 独立 worktree 支持并行写入 | 显式选择 detached 任务 checkout，成员工具明确传入其路径 | 创建、已提交摘要和清理已验证；逐成员 cwd 自动配置与强制隔离未实现 |
 
 依据：[批量 diff 审查](https://www.onorca.dev/docs/review/annotate-ai-diff)、[通知与未读](https://www.onorca.dev/docs/notifications)、[worktree 模型](https://www.onorca.dev/docs/model/worktrees)。这里只吸收设计，不复制源码或依赖 Orca。
 
@@ -35,6 +35,10 @@
 - Client 注册使用公开 `conversation.input.left` slot、官方 inputActions 的插入版本保护、locale/effect；slot 声明消失或插件卸载都会移除入口。没有 DOM 操作、私有 UI 导入或第二份 React。
 
 官方依据：[生命周期与 effect](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/cordis-tutorial/02-lifecycle-and-effects.md)、[依赖注入](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/cordis-tutorial/03-services.md)、[Headless](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/packages/bundle/headless/README.md)。
+
+## 任务交付
+
+`devwork_worktree`、`devwork_handoff`、`devwork_cleanup` 组成小型可选 checkout 生命周期。Leader 摘要与提交来源进入 Git，临时目录在整合验收后删除；`cleanupPending` 呈现尚未收尾的 checkout。详细流程和合并方式边界见[任务交付](task-delivery.zh.md)。
 
 ## 已实现的接口
 
@@ -55,7 +59,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-`tests/headless.mts` 六项行为测试：
+`tests/headless.mts` 七项行为测试：
 
 1. 真实 AgentLoop、官方 Team/tools、JSONL persistence、SessionQuery、Bash/subprocess、workspace-changes：writer 修改 → 依赖 reviewer 审查 → Leader 验收 → 两条意见一批发送 → 原成员修订再验收。整体 diff 收入成员改动，排除之前的 dirty README；过期反馈和并发重复投递被拦截。
 2. 插件卸载取消正在运行的官方验收进程并等待收敛。
@@ -63,6 +67,7 @@ npm pack --dry-run
 4. 官方 pre-execute 拒绝传入嵌套验收，不绕过策略。
 5. inactive owner 不视为成功或自动释放；子成员不能控制 Leader 回合。
 6. 真实 Cordis 的 PENDING、激活、依赖消失、重新激活和工具/提示词释放。
+7. 真实 Team 成员在明确 workdir 的临时 checkout 修改并提交；过期交接、未整合、无摘要、dirty 和权限拒绝时不清理；整合验收并提交摘要后删除自有 checkout，并发/重复清理被拦截，已有 dirty README 保留。
 
 `tests/client.mts` 两项无浏览器检查：加载实际 closure-factory 与官方 SlotRegistry，验证晚声明/折叠/重声明/卸载；验证按钮插入显式请求、保持 insertion revision、不自动发送。模型是本项目确定性脚本，Client locale 是边界 fixture；官方业务服务与 SlotRegistry 使用发布包。没有执行真实模型、完整 DSH CLI profile 或 macOS/Windows 桌面验收。
 
@@ -76,12 +81,14 @@ npm pack --dry-run
 
 Client 公共声明还需要显式安装其传递类型依赖，以及导入公开生成的 remote 类型。这些在 devDependencies 中，不打入浏览器 bundle。Host 与 Client 分开编译，Client 声明保留必要的类型 reference；没有导入私有实现。
 
+**官方快照的同秒等长修改漏报。** 本地诊断观察到内容与文件时间戳已变，官方 before/after tree 却相同；当前推断与复制 index 后的时间戳/racy-Git 检查有关，详见[开发 issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7)。常规 fixture 给基线文件旧 mtime，模拟已有仓库，避免创建测试时的碰撞；这是测试边界，不是生产修复。`DEVWORK_POC_FRESH_BASELINE=1` 可恢复原始基线用于诊断。没有修改官方运行时或用户 index，也没有用自动重试压下失败；缺少官方快照时审查 API 仍拒绝操作。
+
 第一阶段其余边界：
 
-- Team 共享 checkout，没有文件锁、worktree 或合并。writeScopes 是提示，不是隔离承诺。
+- Team 仍继承共享 cwd。临时 worktree 不改变这个 API，成员工具必须明确使用返回路径；没有文件锁或强制沙箱隔离，writeScopes 仍是提示。详见[任务交付](task-delivery.zh.md)。
 - 官方变更是每轮 turn 的快照；当前 API 审查最新已结束 turn，不是整个 feature 跨多轮的累计 diff。
 - 当前回合、验收证据和反馈批次只活在本 Host/Leader 生命周期；进程重启不恢复。一次性 headless CLI 退出后不能继续该临时回合。
 - 反馈只支持单个文本 hunk 的新侧范围；binary/oversized、旧侧/删除行、自动重定位和 unresolved 线程待补。
 - UI 已有发起入口，完整反馈编辑与 Host/Client 传输未接入。真实模型的拆解、任务契约、判断和摘要仍待验证。
 
-下一步优先：真实模型验收同一闭环 → 在公开能力允许的范围内接入小型成果/反馈面板 → 再决定累计 diff、意见保留、第二名 writer 或独立 worktree 的必要性。邮件、远程与恢复继续不进入第一阶段。
+下一步优先：真实模型验收同一闭环 → 在公开能力允许的范围内接入小型成果/反馈面板 → 再决定累计 diff、意见保留、第二名 writer 或 worktree 自动路由 的必要性。邮件、远程与恢复继续不进入第一阶段。
