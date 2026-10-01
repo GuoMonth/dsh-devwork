@@ -1,0 +1,25 @@
+name: Issue categories
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/issue-labels.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  labels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Ensure the two category labels exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh label create 'kind:request' --color '0E8A16' --description 'User needs, feedback, and problem reports / 需求、反馈与问题报告' --force
+          gh label create 'kind:development' --color '1D76DB' --description 'Implementation, fixes, investigations, and maintenance / 实现、修复、技术验证与维护' --force

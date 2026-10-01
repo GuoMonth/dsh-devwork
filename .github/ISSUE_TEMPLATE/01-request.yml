@@ -1,0 +1,39 @@
+name: "需求 / 反馈 · Request / feedback"
+description: "描述用户问题、使用场景与期望结果 / Describe the user problem and desired outcome"
+title: "[Request] "
+labels: ["kind:request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这里记录需求、建议、问题报告和使用反馈。实现方案另建 Development issue 并关联本 issue。
+        Record needs, suggestions, bug reports, and user feedback here. Track implementation in a linked Development issue.
+  - type: dropdown
+    id: category
+    attributes:
+      label: "反馈类型 / Category"
+      options:
+        - "需求或建议 / Feature request"
+        - "问题报告 / Bug report"
+        - "使用反馈或咨询 / Feedback or question"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: "场景与问题 / Context and problem"
+      description: "在什么场景遇到什么问题？问题报告请附复现步骤及版本。 / For bugs, include reproduction steps and versions."
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: "期望结果 / Desired outcome"
+      description: "用户应该得到什么结果？尽量给出可观察的验收条件。 / Describe observable success criteria."
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: "补充信息 / Supporting information"
+      description: "截图、日志、参考项目或相关 issue；请先移除敏感信息。 / Screenshots, logs, references, or related issues."

@@ -1,0 +1,36 @@
+name: "开发任务 · Development"
+description: "实现、修复、技术验证与工程维护 / Implementation, fixes, investigations, and maintenance"
+title: "[Dev] "
+labels: ["kind:development"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        开发任务单独记录实现范围与验证证据。产品任务引用需求；纯工程维护可以没有需求。
+        Track implementation scope and validation separately. Link product work to a request; standalone maintenance is allowed.
+  - type: input
+    id: request
+    attributes:
+      label: "关联需求 / Related request"
+      placeholder: "#123；纯工程维护写无 / None for standalone maintenance"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: "任务与边界 / Task and scope"
+      description: "说明具体交付内容、涉及的公共 API 和必要的技术决策。 / Define deliverables, public APIs, and relevant decisions."
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: "完成条件与验证 / Definition of done and validation"
+      description: "说明如何验证以及需要保留的证据。 / Describe checks and evidence required for completion."
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: "依赖与相关变更 / Dependencies and related changes"
+      description: "关联 issue、PR、commit 或已知阻塞点。 / Link issues, PRs, commits, or known blockers."
