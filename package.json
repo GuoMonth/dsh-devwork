@@ -1,0 +1,47 @@
+{
+  "name": "@guosheng_047/dsh-devwork",
+  "version": "0.1.0-alpha.0",
+  "description": "Desktop development workspace plugin for DeepSeek Harness — initial scaffold",
+  "type": "module",
+  "license": "MIT",
+  "author": "GuoMonth",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuoMonth/dsh-devwork.git"
+  },
+  "homepage": "https://github.com/GuoMonth/dsh-devwork#readme",
+  "bugs": { "url": "https://github.com/GuoMonth/dsh-devwork/issues" },
+  "keywords": ["dsh-plugin", "deepseek-harness", "developer-tools", "agentic-development", "desktop"],
+  "engines": { "node": "^22.19.0 || >=24.0.0" },
+  "packageManager": "npm@11.9.0",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": { "types": "./lib/index.d.ts", "import": "./lib/index.js", "default": "./lib/index.js" },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": ["lib", "cordis.patch.yml", "icon.svg", "locale", "README.md", "README.zh.md", "LICENSE", "CHANGELOG.md"],
+  "icon": "./icon.svg",
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "publishConfig": { "access": "public", "tag": "alpha", "registry": "https://registry.npmjs.org" },
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "smoke": "node scripts/artifact-smoke.mjs",
+    "pack:check": "node scripts/pack-smoke.mjs",
+    "verify": "npm run typecheck && npm run build && publint && npm run smoke",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run verify"
+  },
+  "peerDependencies": { "@deepseek-ai/cordis": "4.0.4" },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "publint": "0.3.24",
+    "typescript": "6.0.3",
+    "yaml": "2.9.1"
+  }
+}

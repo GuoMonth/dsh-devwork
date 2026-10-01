@@ -1,0 +1,4 @@
+# Additive bundle: preserve the user's existing DSH composition.
+- insert:
+    - id: guomonth-devwork
+      name: '@guosheng_047/dsh-devwork'

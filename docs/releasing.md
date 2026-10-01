@@ -1,0 +1,67 @@
+# Releasing
+
+English | [中文](releasing.zh.md)
+
+This is a third-party DSH bundle, not a profile or an official DSH distribution. Initialization does not publish a release.
+
+## Official requirements applied here
+
+The source baseline is DSH `0.2.0-rc.2`, commit `639ed015397290b3745d163aafe02ffee4aa3f84`.
+
+| Contract | Project configuration |
+| --- | --- |
+| npm bundle manifest | `package.json` declares `dsh.bundle.patch`; no `dsh.profile` |
+| Resolvable plugin row | `cordis.patch.yml` inserts the published package name |
+| Cordis entry | `src/index.ts` exports `name` and `apply(ctx)` |
+| Shared runtime identity | Cordis is both a peer and a development dependency; no runtime bundling |
+| Prebuilt distribution | `prepack` builds JavaScript/declarations; `files` includes the patch and assets |
+| Git source installation | `prepare` builds standalone, without a DSH source checkout |
+| Plugin discovery | npm `dsh-plugin` keyword; add GitHub repository topic `dsh-plugin` |
+| Plugin listing metadata | `icon` and `locale/en.json`, `locale/zh.json` with `meta.title`/`meta.description` |
+
+The icon/locale convention follows the official Agent Teams bundle. English/Chinese project documentation is a project choice; upstream translation tracking files are not an external plugin installation requirement.
+
+## Validate
+
+```sh
+npm ci
+npm run verify
+npm run pack:check
+npm pack --dry-run
+```
+
+These validate types, exports, bundle metadata, tarball contents, and importing the extracted package entry. They do not prove a desktop interaction or model task works. Before an actual release, install the tarball into the target DSH desktop, enable/disable the plugin, and verify every advertised capability. Recheck compatibility whenever the DSH baseline changes.
+
+## GitHub alpha release
+
+1. Choose an `x.y.z-alpha.N` version, update `package.json` and its lockfile, and record the real changes in `CHANGELOG.md`.
+2. Run the checks above and review CI.
+3. Only after a release request, tag the reviewed main commit as `v<version>` and push the tag.
+
+The alpha workflow rejects a mismatched version, rechecks the package, and creates a GitHub prerelease with a prebuilt `.tgz` and `SHA256SUMS`. It does not publish npm. Stable releases need a separately reviewed workflow/tag policy.
+
+## npm publication
+
+Use the existing maintainer scope `@guosheng_047`. Confirm npm identity, scope publishing rights, and first-publication package availability before publishing. Authenticate through your normal npm method; no token belongs in the repository.
+
+```sh
+npm whoami
+npm publish --access public --tag alpha
+```
+
+`prepublishOnly` verifies the package and `prepack` builds it. Never promote an alpha scaffold to `latest`. GitHub Actions trusted publishing is not configured by this scaffold; it requires npm-side setup and a deliberate release policy.
+
+After an npm release, users can install `@guosheng_047/dsh-devwork@alpha` from the desktop Plugins page, or run:
+
+```sh
+dsh plugin --profile devwork-demo add @guosheng_047/dsh-devwork@alpha
+```
+
+Before npm publication, install the prebuilt tarball or a local checkout. Git installs require pnpm's explicit build allowance for this package's `prepare` script; follow the exact package key in pnpm's diagnostic and pin the source commit. Tarball/npm installs use built artifacts and do not need that build allowance.
+
+## Primary references
+
+- [Official packaging and installation tutorial](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/user/develop/basic/publish.md)
+- [Official plugin entry tutorial](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/user/develop/basic/index.md)
+- [Official Agent Teams bundle metadata](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/packages/experimental/agent-team-profile/package.json)
+- [Official plugin discovery guidance](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/README.md#community-and-support)
