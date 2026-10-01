@@ -4,6 +4,8 @@
 
 调研日期：2026-10-01。本文是开发建议与源码核查结果，不表示产品功能已经实现。
 
+本文保留初期评估。当前实现和调整后的 headless 优先顺序见 [POC 评估](headless-poc.zh.md)。复用 Team 是当前 POC 选择，不是永久约束；官方 diff 覆盖单轮，不能当作跨轮累计功能交付。
+
 ## 基线
 
 最新发布为 **DSH 0.2.0-rc.2**，2026-09-29 发布；本次核查的 master 与发布标签均为 `639ed015397290b3745d163aafe02ffee4aa3f84`。本项目已有相同基线，无需为了“追新”修改版本。官方 npm 的 Agent Teams bundle、Team service 和 workspace-changes 包均提供 `0.2.0-rc.2`；Cordis 的 peer 为 `~4.0.4`，当前 `4.0.4` 满足要求。

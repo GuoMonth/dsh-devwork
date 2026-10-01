@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 A desktop development workspace built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Talk to one lead AI, let coding tasks advance in parallel, and review the results in one place.
 
-**Status: initial plugin scaffold.** The bundle metadata, plugin entry, bilingual descriptions, build checks, and packaging workflow are set up. Parallel workers, task cards, and diff annotations are planned and are not implemented in this version. No npm release has been published yet.
+**Status: local headless POC.** Official Team development → review → acceptance checks → located feedback → revision is exercised with a scripted model and real DSH services. This does not yet prove real-model autonomy or desktop rendering. No npm release has been published.
 
 ## Direction
 
@@ -15,7 +15,7 @@ A desktop development workspace built on [DeepSeek Harness](https://github.com/d
 
 The first phase focuses on local desktop development. Remote execution, mobile clients, email, and automatic crash recovery are deferred.
 
-See the [phase-one implementation assessment](docs/phase-one.md): reuse the official opt-in Agent Teams bundle and change review on DSH 0.2.0-rc.2, then add Leader development rules and consolidated feedback. Desktop integration still requires validation.
+The [headless POC assessment](docs/headless-poc.md) records the implementation, lifecycle findings, results and blockers. We reuse official tasks and members, gate delivery on current acceptance evidence, and send several diff comments as one follow-up to the same Leader. Temporary task worktrees now support a [committed Leader handoff and cleanup](docs/task-delivery.md). The UI currently provides an editable start request; a result/feedback surface remains to be built. See also the earlier [phase-one assessment](docs/phase-one.md).
 
 ## Develop and try the bundle
 
@@ -26,10 +26,11 @@ git clone https://github.com/GuoMonth/dsh-devwork.git
 cd dsh-devwork
 npm ci
 npm run verify
+npm run pack:check
 npm pack
 ```
 
-In the DSH desktop Plugins page, use the local package directory as an installation source. Enable the bundle; this scaffold adds no conversation controls yet. For CLI validation with an installed DSH CLI, from the directory above the checkout:
+In the DSH desktop Plugins page, use the local package directory as an installation source. Enable Devwork and the official opt-in Agent Teams bundle. The Host also needs official tools, a Bash provider, system prompt, and workspace-changes. Missing services leave Devwork pending. The input action inserts an editable request and never submits it automatically. For CLI validation with an installed DSH CLI, from the directory above the checkout:
 
 ```sh
 dsh plugin --profile devwork-demo add ./dsh-devwork
@@ -37,6 +38,10 @@ dsh --profile devwork-demo --dump-config
 ```
 
 The output should include the Devwork bundle layer and the `guomonth-devwork` row. This CLI profile is an installation check, not a separate desktop application.
+
+The test suite checks Host behavior and Client registration/insertion without a browser. The real-model and native desktop acceptance checks remain open. DSH rc.2 has a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
+
+Same-second equal-size official snapshot misses are tracked in [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7); the existing-repository test baseline is not a production fix.
 
 ## Package and release
 

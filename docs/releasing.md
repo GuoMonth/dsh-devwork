@@ -30,7 +30,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-These validate types, exports, bundle metadata, tarball contents, and importing the extracted package entry. They do not prove a desktop interaction or model task works. Before an actual release, install the tarball into the target DSH desktop, enable/disable the plugin, and verify every advertised capability. Recheck compatibility whenever the DSH baseline changes.
+These validate strict Host/Client/script/test types, seven headless behavior scenarios, two Client boundary scenarios, exports, bundle metadata, and installing/importing the prebuilt tarball in an independent consumer. The Client uses the official closure-factory loader and public conversation slot. The exact rc.2 declaration correction is development-only, excluded from the package; see the [POC assessment](headless-poc.md). They do not prove a desktop interaction or model task works. Before an actual release, install the tarball into the target DSH desktop, enable/disable the plugin, and verify every advertised capability. Recheck compatibility whenever the DSH baseline changes.
 
 ## GitHub alpha release
 
@@ -49,7 +49,7 @@ npm whoami
 npm publish --access public --tag alpha
 ```
 
-`prepublishOnly` verifies the package and `prepack` builds it. Never promote an alpha scaffold to `latest`. GitHub Actions trusted publishing is not configured by this scaffold; it requires npm-side setup and a deliberate release policy.
+`prepublishOnly` verifies the package and `prepack` builds it. Never promote an alpha POC to `latest`. GitHub Actions trusted publishing is not configured by this scaffold; it requires npm-side setup and a deliberate release policy.
 
 After an npm release, users can install `@guosheng_047/dsh-devwork@alpha` from the desktop Plugins page, or run:
 

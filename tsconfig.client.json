@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src/client",
+    "outDir": "lib/client",
+    "lib": ["ES2024", "DOM", "DOM.Iterable", "ESNext.Disposable"],
+    "types": ["react", "react-dom"]
+  },
+  "include": ["src/client/**/*.ts"]
+}
