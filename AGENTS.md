@@ -13,7 +13,7 @@
 - Use dependency injection for consumed services and Cordis effects for resources. Never import another feature's private UI components.
 - If adding a browser entry, isolate Host and Client TypeScript configurations and use documented DSH slots.
 - Acceptance commands must go through the official tool pipeline; retain permission, cancellation, and final-result semantics.
-- Keep the rc.2 declaration correction narrow and development-only. Reassess it on an upstream upgrade; do not disable library checking.
+- Keep the alpha.1 declaration correction (retained from rc.2) narrow and development-only. Reassess it on an upstream upgrade; do not disable library checking.
 - Keep README.md/README.zh.md, docs/releasing.md/docs/releasing.zh.md, and locale/en.json/locale/zh.json in sync.
 - Keep user needs/feedback (kind:request) separate from implementation/maintenance (kind:development), using one category per issue. Link product development tasks to their requests. PRs close development tasks; close requests only when user acceptance is satisfied. Follow CONTRIBUTING.md.
 - Run npm run verify and npm pack --dry-run for package changes. Add behavioral tests when actual product behavior is introduced.

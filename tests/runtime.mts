@@ -79,7 +79,7 @@ export async function until(predicate: () => boolean, message: string): Promise<
     await setTimeout(20)
   }
 }
-export async function boot(options: { plugin?: boolean; changes?: boolean } = {}) {
+export async function boot(options: { plugin?: boolean; changes?: boolean; maxFiles?: number } = {}) {
   const cwd = await mkdtemp(join(tmpdir(), 'devwork-headless-'))
   const ctx = new Context()
   const logs: string[] = []
@@ -89,7 +89,7 @@ export async function boot(options: { plugin?: boolean; changes?: boolean } = {}
     git('init', '-q', '-b', 'main')
     await writeFile(join(cwd, 'math.ts'), INITIAL)
     // Model an existing repository, not a just-indexed same-second file.
-    // Fresh equal-size writes expose rc.2's private-index timestamp issue (#7).
+    // Fresh equal-size writes expose the official private-index timestamp issue (#7).
     // Keep an explicit diagnostic mode; do not hide it behind test retries.
     if (process.env.DEVWORK_POC_FRESH_BASELINE !== '1') {
       const old = new Date('2000-01-01T00:00:00Z')
@@ -113,7 +113,9 @@ export async function boot(options: { plugin?: boolean; changes?: boolean } = {}
     await ctx.plugin(LocalBash, { cwd, timeoutMs: 10_000, maxTimeoutMs: 30_000, maxOutputBytes: 64 * 1024, maxSpillBytes: 64 * 1024, graceMs: 100 })
     await ctx.plugin(ShellEnv, { dshHome: join(cwd, '.sessions') })
     await ctx.plugin(BashTool, { enableRunInBackground: false, promoteOnTimeout: false })
-    const changesFiber = options.changes === false ? undefined : await ctx.plugin(WorkspaceChanges)
+    const changesFiber = options.changes === false ? undefined : await ctx.plugin(WorkspaceChanges, options.maxFiles === undefined ? undefined : {
+      maxFiles: options.maxFiles, timeoutMs: 30_000, outputMaxBytes: 8 * 1024 * 1024, maxFileBytes: 2 * 1024 * 1024, diffTimeoutMs: 100,
+    })
     const pluginFiber = options.plugin === false ? undefined : await ctx.plugin(Plugin)
     const model = new ScriptedModel()
     ctx.llm.registerAdapter(['poc'], model)

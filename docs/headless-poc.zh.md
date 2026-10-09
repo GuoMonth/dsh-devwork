@@ -2,7 +2,7 @@
 
 [English](headless-poc.md) | 中文
 
-基线：DSH 0.2.0-rc.2（`639ed015397290b3745d163aafe02ffee4aa3f84`）、Cordis 4.0.4、Node 24.x、严格 TypeScript 7.0.2。2026-10-01 本地验证。
+基线：DSH 0.2.1-alpha.1（`5badb15009ae1756c3afe0ae0cef1faafc290ccc`）、Cordis 4.0.5-alpha.1、Node 24.x、严格 TypeScript 7.0.2。2026-10-09 本地验证。
 
 ## 评估结论
 
@@ -34,7 +34,11 @@
 - `ctx.effect` 在卸载时取消并等待自己的异步工作，然后释放回合。依赖消失会卸载；依赖回来会得到全新服务，不恢复旧的临时回合。
 - Client 注册使用公开 `conversation.input.left` slot、官方 inputActions 的插入版本保护、locale/effect；slot 声明消失或插件卸载都会移除入口。没有 DOM 操作、私有 UI 导入或第二份 React。
 
-官方依据：[生命周期与 effect](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/cordis-tutorial/02-lifecycle-and-effects.md)、[依赖注入](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/cordis-tutorial/03-services.md)、[Headless](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/packages/bundle/headless/README.md)。
+官方依据：[生命周期与 effect](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/cordis-tutorial/02-lifecycle-and-effects.md)、[依赖注入](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/cordis-tutorial/03-services.md)、[Headless](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/bundle/headless/README.md)。
+
+Host 观察 `session/event` 的实时变更公告，并在 `agent/turn-stopping` 中、官方 recorder 串行监听器之后，将 diff 绑定到只读工作区指纹；不再调用已弃用的同步 Session 历史接口。后续验收不能给旧 diff 换绑新代码。缺失或未绑定的快照、代码变化、文件列表被截断时均拒绝审查；后续未改变代码的轮次可复用原绑定。这防止旧 diff 误审，但不能证明非空官方快照内部没有漏掉某个文件。
+
+升级核查见[官方 alpha.1 评估](upstream-alpha-assessment.zh.md)。
 
 ## 任务交付
 
@@ -59,7 +63,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-`tests/headless.mts` 七项行为测试：
+`tests/headless.mts` 九项行为测试：
 
 1. 真实 AgentLoop、官方 Team/tools、JSONL persistence、SessionQuery、Bash/subprocess、workspace-changes：writer 修改 → 依赖 reviewer 审查 → Leader 验收 → 两条意见一批发送 → 原成员修订再验收。整体 diff 收入成员改动，排除之前的 dirty README；过期反馈和并发重复投递被拦截。
 2. 插件卸载取消正在运行的官方验收进程并等待收敛。
@@ -69,19 +73,22 @@ npm pack --dry-run
 6. 真实 Cordis 的 PENDING、激活、依赖消失、重新激活和工具/提示词释放。
 7. 真实 Team 成员在明确 workdir 的临时 checkout 修改并提交；过期交接、未整合、无摘要、dirty 和权限拒绝时不清理；整合验收并提交摘要后删除自有 checkout，并发/重复清理被拦截，已有 dirty README 保留。
 
+8. 外部编辑后仅验收的轮次，即使通过检查，也不能复用旧 diff；恢复完全相同内容可复用，轮次内修改则产生新绑定。
+9. 两个成果文件被官方上限截为一个时，拒绝呈现完整审查。
+
 `tests/client.mts` 两项无浏览器检查：加载实际 closure-factory 与官方 SlotRegistry，验证晚声明/折叠/重声明/卸载；验证按钮插入显式请求、保持 insertion revision、不自动发送。模型是本项目确定性脚本，Client locale 是边界 fixture；官方业务服务与 SlotRegistry 使用发布包。没有执行真实模型、完整 DSH CLI profile 或 macOS/Windows 桌面验收。
 
 ## 发现的阻塞与限制
 
-**rc.2 公开声明缺陷。** `dsh-session-projection` 的 wire register 泛型允许 `K` 取 Client map 的任意键，却用它索引 Host state map。独立插件/测试类型程序只导入部分公开入口时，`subagent` 等键的私有 Host 声明未被带入，触发严格库检查错误。这是公开声明的组合问题，不能把它归因于用户安装 TS7。
+**alpha.1 仍保留 rc.2 的公开声明缺陷。** `dsh-session-projection` 的 wire register 泛型允许 `K` 取 Client map 的任意键，却用它索引 Host state map。独立插件/测试类型程序只导入部分公开入口时，`subagent` 等键的私有 Host 声明未被带入，触发严格库检查错误。这是公开声明的组合问题，不能把它归因于用户安装 TS7。
 
-`scripts/prepare-types.mts` 在开发依赖中将约束收紧为 `keyof SessionProjectionMap & keyof SessionProjectionStateMap`。它检查精确 rc.2 版本与原始签名，幂等执行，拒绝不认识的声明；没有 `any`、类型压制或 `skipLibCheck`。只改开发目录中的一个 `.d.ts`，不改官方运行时代码，不打进 npm 产物，不在用户安装时修补宿主。升级官方版本需重新评估；下游严格 TS 消费仍受上游原始声明质量影响。
+`scripts/prepare-types.mts` 在开发依赖中将约束收紧为 `keyof SessionProjectionMap & keyof SessionProjectionStateMap`。它检查精确 alpha.1 版本与原始签名，幂等执行，拒绝不认识的声明；没有 `any`、类型压制或 `skipLibCheck`。只改开发目录中的一个 `.d.ts`，不改官方运行时代码，不打进 npm 产物，不在用户安装时修补宿主。升级官方版本需重新评估；下游严格 TS 消费仍受上游原始声明质量影响。
 
 类型后续在[开发 issue #4](https://github.com/GuoMonth/dsh-devwork/issues/4) 跟踪。`publint` 目前提示 ESM 包中的 Client closure-factory 看起来像 CJS。该入口是 DSH loader 脚本，不是独立 Node import；factory/SlotRegistry 测试覆盖它的实际加载约定，保留此工具警告。
 
 Client 公共声明还需要显式安装其传递类型依赖，以及导入公开生成的 remote 类型。这些在 devDependencies 中，不打入浏览器 bundle。Host 与 Client 分开编译，Client 声明保留必要的类型 reference；没有导入私有实现。
 
-**官方快照的同秒等长修改漏报。** 本地诊断观察到内容与文件时间戳已变，官方 before/after tree 却相同；当前推断与复制 index 后的时间戳/racy-Git 检查有关，详见[开发 issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7)。常规 fixture 给基线文件旧 mtime，模拟已有仓库，避免创建测试时的碰撞；这是测试边界，不是生产修复。`DEVWORK_POC_FRESH_BASELINE=1` 可恢复原始基线用于诊断。没有修改官方运行时或用户 index，也没有用自动重试压下失败；缺少官方快照时审查 API 仍拒绝操作。
+**官方快照的同秒等长修改漏报。** 本地诊断观察到内容与文件时间戳已变，官方 before/after tree 却相同；当前推断与复制 index 后的时间戳/racy-Git 检查有关，详见[开发 issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7)。常规 fixture 给基线文件旧 mtime，模拟已有仓库，避免创建测试时的碰撞；这是测试边界，不是生产修复。`DEVWORK_POC_FRESH_BASELINE=1` 可恢复原始基线用于诊断。没有修改官方运行时或用户 index，也没有用自动重试压下失败；缺少官方快照时审查 API 仍拒绝操作。alpha.1 保留相同快照实现；新绑定保护也会拦截代码变化后的旧快照，但并非官方漏报修复。
 
 第一阶段其余边界：
 

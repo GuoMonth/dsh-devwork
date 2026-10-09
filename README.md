@@ -19,7 +19,7 @@ The [headless POC assessment](docs/headless-poc.md) records the implementation, 
 
 ## Develop and try the bundle
 
-Baseline: DSH **0.2.0-rc.2**, Cordis **4.0.4**. Use **Node.js 24.x only**; the minor/patch version is not fixed. CI and releases use Node 24. All source and development scripts use **strict TypeScript 7.0.2**, with unchecked indexed access and exact optional property checks enabled.
+Baseline: DSH **0.2.1-alpha.1**, Cordis **4.0.5-alpha.1**. Use **Node.js 24.x only**; the minor/patch version is not fixed. CI and releases use Node 24. All source and development scripts use **strict TypeScript 7.0.2**, with unchecked indexed access and exact optional property checks enabled.
 
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git
@@ -39,9 +39,11 @@ dsh --profile devwork-demo --dump-config
 
 The output should include the Devwork bundle layer and the `guomonth-devwork` row. This CLI profile is an installation check, not a separate desktop application.
 
-The test suite checks Host behavior and Client registration/insertion without a browser. The real-model and native desktop acceptance checks remain open. DSH rc.2 has a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
+The test suite checks Host behavior and Client registration/insertion without a browser. The real-model and native desktop acceptance checks remain open. DSH alpha.1 retains a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
 
 Same-second equal-size official snapshot misses are tracked in [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7); the existing-repository test baseline is not a production fix.
+
+Official alpha.1 upgrade findings: [assessment](docs/upstream-alpha-assessment.md). Diff bindings reject changed checkouts and truncated official file lists; they do not fix upstream snapshot omissions.
 
 ## Package and release
 

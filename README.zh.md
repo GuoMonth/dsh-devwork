@@ -19,7 +19,7 @@
 
 ## 开发与试装
 
-兼容基线：DSH **0.2.0-rc.2**，Cordis **4.0.4**。仅支持 **Node.js 24.x**，不锁定小版本和补丁版本；CI 与发布流程统一使用 Node 24。源码和开发脚本均采用**严格 TypeScript 7.0.2**，并启用索引访问与可选属性的额外检查。
+兼容基线：DSH **0.2.1-alpha.1**，Cordis **4.0.5-alpha.1**。仅支持 **Node.js 24.x**，不锁定小版本和补丁版本；CI 与发布流程统一使用 Node 24。源码和开发脚本均采用**严格 TypeScript 7.0.2**，并启用索引访问与可选属性的额外检查。
 
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git
@@ -39,9 +39,11 @@ dsh --profile devwork-demo --dump-config
 
 输出应包含 Devwork 的 bundle 层和 `guomonth-devwork` 插件行。这个 CLI profile 仅用于验证安装，不是独立桌面应用。
 
-测试无需浏览器，覆盖 Host 行为及 Client 注册、文本插入。真实模型与原生桌面验收仍待完成。DSH rc.2 的公开声明组合存在类型缺陷，精确、仅开发期的修正在 [POC 评估](docs/headless-poc.zh.md) 中说明。
+测试无需浏览器，覆盖 Host 行为及 Client 注册、文本插入。真实模型与原生桌面验收仍待完成。DSH alpha.1 仍保留公开声明组合类型缺陷，精确、仅开发期的修正在 [POC 评估](docs/headless-poc.zh.md) 中说明。
 
 官方快照在同秒等长修改下的漏报另由 [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7) 跟踪；当前测试采用已有仓库的时间基线，这不是生产修复。
+
+官方 alpha.1 升级核查见[评估](docs/upstream-alpha-assessment.zh.md)。diff 绑定会拒绝代码变化后的旧快照和被截断的官方文件列表；这不是上游快照漏报修复。
 
 ## 打包与发布
 

@@ -2,7 +2,7 @@
 
 English | [中文](headless-poc.zh.md)
 
-Baseline: DSH 0.2.0-rc.2 (`639ed015397290b3745d163aafe02ffee4aa3f84`), Cordis 4.0.4, Node 24.x, strict TypeScript 7.0.2. Local validation: 2026-10-01.
+Baseline: DSH 0.2.1-alpha.1 (`5badb15009ae1756c3afe0ae0cef1faafc290ccc`), Cordis 4.0.5-alpha.1, Node 24.x, strict TypeScript 7.0.2. Local validation: 2026-10-09.
 
 ## Assessment
 
@@ -34,7 +34,11 @@ Sources: [batch diff review](https://www.onorca.dev/docs/review/annotate-ai-diff
 - A lifetime effect aborts and drains owned asynchronous operations on unload. Dependency loss unloads the feature; return creates a fresh service without old ephemeral rounds.
 - Client uses the public `conversation.input.left` slot, inputActions revision-protected insertion and locale/effects. Slot collapse and plugin unload remove it. No private UI imports, DOM manipulation or duplicate React.
 
-Official references: [effects](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/cordis-tutorial/02-lifecycle-and-effects.md), [injection](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/cordis-tutorial/03-services.md), [headless](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/packages/bundle/headless/README.md).
+Official references: [effects](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/cordis-tutorial/02-lifecycle-and-effects.md), [injection](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/cordis-tutorial/03-services.md), [headless](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/bundle/headless/README.md).
+
+The Host observes live `session/event` announcements and binds each official diff to a read-only fingerprint in `agent/turn-stopping`, after the official serial recorder listener. It does not use deprecated synchronous Session history APIs. Later verification cannot rebind an old diff to changed content. Missing/unbound snapshots, changed checkouts and truncated file lists block review. An unchanged later turn may reuse the bound snapshot. This prevents stale review; it cannot detect every omitted file within an otherwise nonempty official snapshot.
+
+Upgrade findings: [official alpha.1 assessment](upstream-alpha-assessment.md).
 
 ## Task delivery
 
@@ -59,7 +63,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-Seven `tests/headless.mts` behavior scenarios cover:
+Nine `tests/headless.mts` behavior scenarios cover:
 
 1. Real AgentLoop, Team/tools, JSONL persistence, SessionQuery, Bash/subprocess and workspace-changes: writer edit, dependent read-only review, Leader acceptance, two comments in one batch, same-member revision and recheck. Root diff includes member changes and excludes an existing dirty README; stale feedback and concurrent duplicate delivery fail closed.
 2. Unload cancels/drains a running official check process.
@@ -69,11 +73,14 @@ Seven `tests/headless.mts` behavior scenarios cover:
 6. Real Cordis PENDING, activation, dependency loss/reactivation and tool/prompt cleanup.
 7. Real Team member edits/commits in an explicit temporary workdir; stale/unintegrated/missing-summary/dirty/policy-denied cleanup refuses, verified committed handoff removes only the owned checkout, concurrent/repeated cleanup is rejected, existing dirty README remains.
 
+8. An external edit followed by a verification-only turn cannot reuse an old diff, despite passing checks; restored identical content can reuse it, and a recorded revision creates a new binding.
+9. An official one-file cap on a two-file result refuses a complete review.
+
 Two `tests/client.mts` browser-free checks load the actual closure factory with official SlotRegistry, exercise declaration/collapse/redeclaration/unload, and check explicit request insertion, insertion revision and no auto-submit. The model is our deterministic script and Client locale is a boundary fixture. Business services and SlotRegistry use published official packages. Real models, a complete CLI profile and macOS/Windows desktop have not been validated.
 
 ## Blockers and limits
 
-**rc.2 public declaration defect:** the projection wire-register overload lets `K` span Client keys while indexing Host state keys. Partial public-entry type programs expose keys such as `subagent` without their private Host declarations, causing strict library errors. This is declaration composition, not a requirement for plugin users to install TS7.
+**alpha.1 public declaration defect (retained from rc.2):** the projection wire-register overload lets `K` span Client keys while indexing Host state keys. Partial public-entry type programs expose keys such as `subagent` without their private Host declarations, causing strict library errors. This is declaration composition, not a requirement for plugin users to install TS7.
 
 `scripts/prepare-types.mts` narrows the development declaration to `keyof SessionProjectionMap & keyof SessionProjectionStateMap`. It validates exact version/signature, is idempotent and refuses unfamiliar input. No `any`, suppressions or `skipLibCheck`. It changes one development `.d.ts`, no runtime, no published artifact and no user-host installation. Reassess on upgrade; downstream strict TS consumers remain exposed to upstream declaration quality.
 
@@ -81,7 +88,7 @@ The type follow-up is tracked in [development issue #4](https://github.com/GuoMo
 
 Client declarations also require explicit transitive type dependencies and public generated remote types. These are development dependencies, not browser bundle inputs. Separate Host/Client programs and retained type references keep emitted declarations self-contained without private imports.
 
-**Same-second equal-size snapshot misses.** Local traces showed changed content/timestamps but identical official before/after trees. Copied-index timestamps affecting racy-Git checks are the current hypothesis; see [development issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7). Normal fixtures use an old baseline mtime to model an existing repository and avoid creation-time collisions. This bounds the tests, not a production fix. `DEVWORK_POC_FRESH_BASELINE=1` restores the fresh baseline for diagnosis. No official runtime or user index is modified, and failures are not suppressed with retries. Missing official snapshots still block review.
+**Same-second equal-size snapshot misses.** Local traces showed changed content/timestamps but identical official before/after trees. Copied-index timestamps affecting racy-Git checks are the current hypothesis; see [development issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7). Normal fixtures use an old baseline mtime to model an existing repository and avoid creation-time collisions. This bounds the tests, not a production fix. `DEVWORK_POC_FRESH_BASELINE=1` restores the fresh baseline for diagnosis. No official runtime or user index is modified, and failures are not suppressed with retries. Missing official snapshots still block review. The same implementation remains in alpha.1; the new binding guard also rejects an old snapshot after later checkout changes, but is not an upstream snapshot fix.
 
 Remaining first-phase boundaries:
 

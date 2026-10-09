@@ -93,6 +93,7 @@ test('UI is an editable explicit request, preserves insertion revision and never
       captureInsertion: () => span,
       insertText: (value, captured) => { assert.equal(captured, span); insertions.push(value); return true },
       setDraft: () => { throw new Error('Must not replace the existing draft') },
+      persistDraft: () => { throw new Error('Only the official insertion action owns draft persistence') },
       addAttachments: () => true, removeAttachment: () => {}, pruneAttachments: () => {}, submit: () => { submissions++ },
     }
     const props: StartProps = { inputActions: actions, t: key => dictionary[key] ?? key }

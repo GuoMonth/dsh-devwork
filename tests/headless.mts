@@ -225,6 +225,66 @@ test('real Team + AgentLoop + bash + diff: develop, review, batch feedback, revi
   } finally { await r.close() }
 })
 
+test('review binds the official diff to its stopping turn, not a later passing verification', { timeout: 40_000 }, async () => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    r.ctx.devwork.open(r.lead, { goal: 'Review the actual current result', taskIds: [writing.id], checks: [CHECK] })
+    r.model.script(r.lead, [tool('bash', { command: writeCommand(FIXED), description: 'Produce the initial change' }), tool('devwork_verify', {}), text('Initial result verified.')])
+    prompt(r.lead, 'Implement and verify the result.')
+    await r.lead.whenIdle()
+    const first = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.deepEqual(first.files, ['math.ts'])
+
+    // An external edit precedes a verification-only turn. The official recorder
+    // correctly has no new turn diff, so its old event must not gain a new binding.
+    await writeFile(join(r.cwd, 'math.ts'), REVISED)
+    r.model.script(r.lead, [tool('devwork_verify', {}), text('New checkout passes, but no fresh diff was produced.')])
+    prompt(r.lead, 'Verify the externally revised checkout.')
+    await r.lead.whenIdle()
+    assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).stage, 'ready-for-review')
+    assert.equal(r.lead.session.snapshotEvents().filter(event => event.type === 'workspace/changes').at(-1)?.seq, first.seq)
+    await assert.rejects(() => r.ctx.devwork.review(r.lead, SIGNAL), /changed after the official snapshot/)
+    await assert.rejects(() => r.ctx.devwork.prepareFeedback(r.lead, first, [{ file: 'math.ts', startLine: 1, endLine: 1, text: 'Comment on the old implementation' }], SIGNAL), /Unknown review snapshot/)
+
+    // An unchanged later verification may legitimately reuse the same bound diff.
+    await writeFile(join(r.cwd, 'math.ts'), FIXED)
+    r.model.script(r.lead, [tool('devwork_verify', {}), text('Original reviewed checkout verified again.')])
+    prompt(r.lead, 'Reverify the restored result.')
+    await r.lead.whenIdle()
+    assert.equal((await r.ctx.devwork.review(r.lead, SIGNAL)).seq, first.seq)
+
+    r.model.script(r.lead, [tool('bash', { command: writeCommand(REVISED), description: 'Revise during a recorded turn' }), tool('devwork_verify', {}), text('Revision recorded and verified.')])
+    prompt(r.lead, 'Produce a fresh revision and verify it.')
+    await r.lead.whenIdle()
+    const current = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.ok(current.seq > first.seq)
+    assert.notEqual(current.fingerprint, first.fingerprint)
+    const batch = await r.ctx.devwork.prepareFeedback(r.lead, current, [{ file: 'math.ts', startLine: 1, endLine: 1, text: 'Keep the new comment' }], SIGNAL)
+    assert.match(batch.prompt, /preserve zero and negative/)
+  } finally { await r.close() }
+})
+
+test('review refuses a truncated official file list', { timeout: 30_000 }, async () => {
+  const r = await boot({ maxFiles: 1 })
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    r.ctx.devwork.open(r.lead, { goal: 'Never hide changed files in a review', taskIds: [writing.id], checks: [CHECK] })
+    r.model.script(r.lead, [tool('bash', { command: `${writeCommand(FIXED)} && node -e ${quote("require('node:fs').writeFileSync('result.txt', 'Additional result\\n')")}`, description: 'Change two files with an official one-file summary cap' }), tool('devwork_verify', {}), text('Both files changed and the check passed.')])
+    prompt(r.lead, 'Implement and verify both result files.')
+    await r.lead.whenIdle()
+    assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).stage, 'ready-for-review')
+    const event = r.lead.session.snapshotEvents().filter(event => event.type === 'workspace/changes').at(-1)
+    assert.ok(event)
+    const summary = r.ctx.workspaceChanges.summary(r.lead.id, event.seq)
+    assert.equal(summary?.total, 2)
+    assert.equal(summary?.files.length, 1)
+    await assert.rejects(() => r.ctx.devwork.review(r.lead, SIGNAL), /summary is truncated/)
+  } finally { await r.close() }
+})
+
 test('plugin unload cancels and drains in-flight official verification', { timeout: 20_000 }, async () => {
   const r = await boot()
   try {
