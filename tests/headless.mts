@@ -40,7 +40,21 @@ test('owned worktree: real Team edits, committed Leader handoff, verified integr
     }
     const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' })
     const commit = (message: string) => `git -c user.name='Devwork POC' -c user.email=poc@example.invalid -c commit.gpgsign=false commit -m ${quote(message)}`
-    const lease = value(await invoke('devwork_worktree', { taskId: writing.id }))
+    r.ctx.tools.register(defineTool({
+      name: 'poc_create_and_replace', description: 'Fixture: replace immediately after Host worktree creation starts.', parameters: {},
+      output: { schema: { type: 'string' }, render: (_args, output) => [{ type: 'text', text: output }] },
+      execute: async (_args, exec) => {
+        const creating = r.ctx.devwork.createWorktree(r.lead, writing.id, exec)
+        try {
+          // No await: create is still before its first realpath/Git result and owned.set.
+          assert.throws(() => r.ctx.devwork.open(r.lead, { goal: 'Replace during creation', taskIds: [writing.id], checks: [CHECK] }), /Finish the owned worktree/)
+        } finally {
+          checkout = (await creating).path
+        }
+        return JSON.stringify(await creating)
+      },
+    }))
+    const lease = value(await invoke('poc_create_and_replace', {}))
     checkout = string(lease.path)
     const worktreeId = string(lease.id)
     assert.equal(string(lease.taskId), writing.id)
@@ -139,6 +153,50 @@ test('owned worktree: real Team edits, committed Leader handoff, verified integr
     // Fixture-only cleanup on assertion failure; product uses Git without force.
     if (checkout !== undefined) await rm(checkout, { recursive: true, force: true })
   }
+})
+
+
+test('failed and canceled worktree creation release the round reservation', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    const contract = { goal: 'Keep pending creation attached to its round', taskIds: [writing.id], checks: [CHECK] }
+    r.ctx.devwork.open(r.lead, contract)
+    r.ctx.on('tools/pre-execute', async (exec, next) => {
+      if (exec.name === 'bash') return { kind: 'deny', reason: 'Fixture denies worktree creation' }
+      return next()
+    })
+    let exercised = false
+    r.ctx.tools.register(defineTool({
+      name: 'poc_failed_creation', description: 'Fixture: failed creation must release its round reservation.', parameters: {},
+      output: { schema: { type: 'string' }, render: (_args, output) => [{ type: 'text', text: output }] },
+      execute: async (_args, exec) => {
+        for (const cancel of [false, true]) {
+          const controller = new AbortController()
+          const creating = r.ctx.devwork.createWorktree(r.lead, writing.id, { ...exec, signal: controller.signal })
+          const rejected = assert.rejects(creating, cancel ? /abort/i : /denied|denies/i)
+          try {
+            assert.throws(() => r.ctx.devwork.open(r.lead, contract), /Finish the owned worktree/)
+          } finally {
+            if (cancel) controller.abort()
+            await rejected
+          }
+          assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).cleanupPending.length, 0)
+          assert.doesNotThrow(() => r.ctx.devwork.open(r.lead, contract))
+        }
+        const aborted = new AbortController()
+        aborted.abort()
+        assert.throws(() => r.ctx.devwork.createWorktree(r.lead, writing.id, { ...exec, signal: aborted.signal }), /abort/i)
+        assert.doesNotThrow(() => r.ctx.devwork.open(r.lead, contract))
+        exercised = true
+        return 'Creation failure and cancellation released their reservations.'
+      },
+    }))
+    r.model.script(r.lead, [tool('poc_failed_creation', {}), text('Failure paths checked.')])
+    prompt(r.lead, 'Exercise creation failure and cancellation.')
+    await r.lead.whenIdle()
+    assert.ok(exercised, JSON.stringify(r.lead.session.snapshotEvents().filter(event => event.type === 'tool/result')))
+  } finally { await r.close() }
 })
 
 test('real Team + AgentLoop + bash + diff: develop, review, batch feedback, revise', { timeout: 40_000 }, async () => {
