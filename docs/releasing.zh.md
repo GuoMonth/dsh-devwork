@@ -6,7 +6,7 @@
 
 ## 已采用的官方要求
 
-源码基线为 DSH `0.2.0-rc.2`，提交 `639ed015397290b3745d163aafe02ffee4aa3f84`。
+源码基线为 DSH `0.2.1-alpha.1`，提交 `5badb15009ae1756c3afe0ae0cef1faafc290ccc`。
 
 | 约定 | 项目配置 |
 | --- | --- |
@@ -30,7 +30,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-这些检查覆盖类型、入口、bundle 元数据、tarball 内容，以及解包后的入口导入，不证明桌面交互或模型任务已可用。真正发布前，在目标 DSH 桌面端安装 tarball、启用/禁用插件，并验证所有对外宣称的功能。更换 DSH 基线后重新检查兼容性。
+这些检查覆盖严格 Host/Client/脚本/测试类型、九项 headless 行为场景、两项 Client 边界场景、入口、bundle 元数据，以及独立消费项目安装和导入预构建 tarball。Client 使用官方 closure-factory loader 和公开会话 slot。精确的 alpha.1 声明修正仅用于开发、不进入发布包，见 [POC 评估](headless-poc.zh.md)。这些检查不证明桌面交互或模型任务已可用。真正发布前，在目标 DSH 桌面端安装 tarball、启用/禁用插件，并验证所有对外宣称的功能。更换 DSH 基线后重新检查兼容性。
 
 ## GitHub alpha 发布
 
@@ -49,7 +49,7 @@ npm whoami
 npm publish --access public --tag alpha
 ```
 
-`prepublishOnly` 检查包，`prepack` 执行构建。不要把 alpha 骨架推到 `latest`。本骨架没有配置 GitHub Actions trusted publishing；它需要 npm 侧设置及明确的发布策略。
+`prepublishOnly` 检查包，`prepack` 执行构建。不要把 alpha POC推到 `latest`。本骨架没有配置 GitHub Actions trusted publishing；它需要 npm 侧设置及明确的发布策略。
 
 发布 npm 后，用户可以在桌面端插件页面安装 `@guosheng_047/dsh-devwork@alpha`，也可以执行：
 
@@ -61,7 +61,7 @@ dsh plugin --profile devwork-demo add @guosheng_047/dsh-devwork@alpha
 
 ## 一手参考
 
-- [官方打包与安装教程](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/user/develop/basic/publish.zh.md)
-- [官方插件入口教程](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/docs/user/develop/basic/index.zh.md)
-- [官方 Agent Teams bundle 元数据](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/packages/experimental/agent-team-profile/package.json)
-- [官方插件发现说明](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/README.md#community-and-support)
+- [官方打包与安装教程](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/user/develop/basic/publish.zh.md)
+- [官方插件入口教程](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/user/develop/basic/index.zh.md)
+- [官方 Agent Teams bundle 元数据](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/experimental/agent-team-profile/package.json)
+- [官方插件发现说明](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/README.md#community-and-support)

@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2024",
+    "lib": ["ES2024", "ESNext.Disposable"],
+    "types": ["node"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -16,5 +18,5 @@
     "skipLibCheck": false,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/*.ts"]
 }

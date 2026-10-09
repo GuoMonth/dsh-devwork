@@ -4,7 +4,7 @@
 
 基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的桌面开发工作台。和一个主控 AI 沟通，让开发任务并行推进，在同一个地方查看和审查成果。
 
-**当前状态：插件初始化骨架。** 已配置 bundle 元数据、插件入口、中英文描述、构建检查和打包流程。并行 Worker、任务卡、diff 批注尚未实现。目前没有发布 npm 版本。
+**当前状态：本地 headless POC。** 已用脚本模型和真实 DSH 服务验证团队开发 → 审查 → 验收 → 定位反馈 → 修改的闭环；尚未证明真实模型自主协作或桌面渲染质量。目前没有发布 npm 版本。
 
 ## 产品方向
 
@@ -15,21 +15,22 @@
 
 第一阶段聚焦本地桌面开发。远程执行、手机客户端、邮件和崩溃自动恢复暂缓。
 
-参见[第一阶段开发评估](docs/phase-one.zh.md)：基于 DSH 0.2.0-rc.2 复用官方显式启用的 Agent Teams 和代码变更审查，再补充 Leader 开发规则与集中反馈。桌面集成仍需实际验证。
+参见[headless POC 评估](docs/headless-poc.zh.md)，包含实现、生命周期发现、验证结果与阻塞点。复用官方任务和成员，以当前代码的验收证据约束交付，把多个 diff 评论作为一条消息交回同一个 Leader。临时任务 worktree 已支持[提交 Leader 摘要后的交付清理](docs/task-delivery.zh.md)。UI 目前提供可编辑的启动请求，成果和反馈界面仍待实现。另见早期的[第一阶段评估](docs/phase-one.zh.md)。
 
 ## 开发与试装
 
-兼容基线：DSH **0.2.0-rc.2**，Cordis **4.0.4**。仅支持 **Node.js 24.x**，不锁定小版本和补丁版本；CI 与发布流程统一使用 Node 24。源码和开发脚本均采用**严格 TypeScript 7.0.2**，并启用索引访问与可选属性的额外检查。
+兼容基线：DSH **0.2.1-alpha.1**，Cordis **4.0.5-alpha.1**。仅支持 **Node.js 24.x**，不锁定小版本和补丁版本；CI 与发布流程统一使用 Node 24。源码和开发脚本均采用**严格 TypeScript 7.0.2**，并启用索引访问与可选属性的额外检查。
 
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git
 cd dsh-devwork
 npm ci
 npm run verify
+npm run pack:check
 npm pack
 ```
 
-在 DSH 桌面端「插件」页面，以本地包目录作为安装来源并启用。当前骨架尚未增加会话控件。也可以在已安装 DSH CLI 的环境里，从仓库的上级目录验证安装：
+在 DSH 桌面端「插件」页面，以本地包目录试装，开启 Devwork 和官方显式启用的 Agent Teams bundle。Host 还需要官方 tools、Bash provider、system prompt 和 workspace-changes；依赖缺失时 Devwork 保持 pending。输入区入口只插入可编辑请求，不自动发送。也可以在已安装 DSH CLI 的环境里，从仓库的上级目录验证安装：
 
 ```sh
 dsh plugin --profile devwork-demo add ./dsh-devwork
@@ -37,6 +38,12 @@ dsh --profile devwork-demo --dump-config
 ```
 
 输出应包含 Devwork 的 bundle 层和 `guomonth-devwork` 插件行。这个 CLI profile 仅用于验证安装，不是独立桌面应用。
+
+测试无需浏览器，覆盖 Host 行为及 Client 注册、文本插入。真实模型与原生桌面验收仍待完成。DSH alpha.1 仍保留公开声明组合类型缺陷，精确、仅开发期的修正在 [POC 评估](docs/headless-poc.zh.md) 中说明。
+
+官方快照在同秒等长修改下的漏报另由 [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7) 跟踪；当前测试采用已有仓库的时间基线，这不是生产修复。
+
+官方 alpha.1 升级核查见[评估](docs/upstream-alpha-assessment.zh.md)。diff 绑定会拒绝代码变化后的旧快照和被截断的官方文件列表；这不是上游快照漏报修复。
 
 ## 打包与发布
 

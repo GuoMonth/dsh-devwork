@@ -1,7 +1,7 @@
 {
   "name": "@guosheng_047/dsh-devwork",
   "version": "0.1.0-alpha.0",
-  "description": "Desktop development workspace plugin for DeepSeek Harness — initial scaffold",
+  "description": "Local development rounds, verification evidence and consolidated review for DeepSeek Harness \u2014 headless POC",
   "type": "module",
   "license": "MIT",
   "author": "GuoMonth",
@@ -10,39 +10,162 @@
     "url": "git+https://github.com/GuoMonth/dsh-devwork.git"
   },
   "homepage": "https://github.com/GuoMonth/dsh-devwork#readme",
-  "bugs": { "url": "https://github.com/GuoMonth/dsh-devwork/issues" },
-  "keywords": ["dsh-plugin", "deepseek-harness", "developer-tools", "agentic-development", "desktop"],
-  "engines": { "node": ">=24 <25" },
+  "bugs": {
+    "url": "https://github.com/GuoMonth/dsh-devwork/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "developer-tools",
+    "agentic-development",
+    "desktop"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  },
   "packageManager": "npm@11.9.0",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
   "exports": {
-    ".": { "types": "./lib/index.d.ts", "import": "./lib/index.js", "default": "./lib/index.js" },
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js",
+      "default": "./lib/index.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./locale/*.json": "./locale/*.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./client": {
+      "types": "./lib/client/index.d.ts",
+      "default": "./lib/client.js"
+    }
   },
-  "files": ["lib", "cordis.patch.yml", "icon.svg", "locale", "README.md", "README.zh.md", "LICENSE", "CHANGELOG.md"],
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale",
+    "README.md",
+    "README.zh.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "icon": "./icon.svg",
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
-  "publishConfig": { "access": "public", "tag": "alpha", "registry": "https://registry.npmjs.org" },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha",
+    "registry": "https://registry.npmjs.org"
+  },
   "scripts": {
     "clean": "node scripts/clean.mts",
-    "build": "npm run clean && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json",
+    "build": "node scripts/prepare-types.mts && npm run clean && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/build-client.mts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.scripts.json && tsc -p tsconfig.tests.json && tsc -p tsconfig.tests-client.json",
     "smoke": "node scripts/artifact-smoke.mts",
     "pack:check": "node scripts/pack-smoke.mts",
-    "verify": "npm run typecheck && npm run build && publint && npm run smoke",
+    "verify": "npm run build && npm run typecheck && npm run test:headless && npm run test:client && publint && npm run smoke",
     "prepare": "npm run build",
     "prepack": "npm run build",
-    "prepublishOnly": "npm run verify"
+    "prepublishOnly": "npm run verify",
+    "test:headless": "node --test tests/headless.mts",
+    "test:client": "node --test tests/client.mts"
   },
-  "peerDependencies": { "@deepseek-ai/cordis": "4.0.4" },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.5-alpha.1",
+    "@deepseek-ai/dsh-agent": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-locale": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-experimental-agent-team": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-llm": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-session": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-subprocess": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-system-prompt": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-workspace-changes": "0.2.1-alpha.1",
+    "react": "^18.2.0"
+  },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/cordis": "4.0.5-alpha.1",
+    "@deepseek-ai/dsh-agent": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-agent-loop": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-agent-loop-testkit": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-api-job-controller": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-api-remotes": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-api-terminal-controller": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-api-workspace-controller": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-api-workspace-files": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-bash-local": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-file-upload": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-locale": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-store": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-ui-session": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-cordis-host-runner": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-experimental-agent-team": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-experimental-tool-agent-team": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-host-plugin-inventory": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-llm": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-llm-retry": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-plugin-manager": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-session": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-session-query-sqlite": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-session-reference": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-shell-env": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-subagent": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-subagent-spawn-in-process": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-subprocess": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-system-prompt": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-tool-bash": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-workspace": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-workspace-changes": "0.2.1-alpha.1",
     "@types/node": "24.19.0",
+    "@types/react": "18.3.1",
+    "@types/react-dom": "18.3.0",
+    "esbuild": "0.25.12",
+    "lexical": "0.49.0",
     "publint": "0.3.24",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "typescript": "7.0.2",
     "yaml": "2.9.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-client-ui-slots": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-conversation": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-locale": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-renderer": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
   }
 }

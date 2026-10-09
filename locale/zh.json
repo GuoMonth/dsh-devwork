@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "DSH Devwork",
-    "description": "DSH 开发者工作台。当前为初始化骨架；并行开发与代码审查功能尚在规划。"
+    "description": "通过验证证据与集中审查组织本地开发。当前为 headless POC；真实模型与桌面验收待完成。"
   }
 }

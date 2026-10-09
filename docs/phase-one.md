@@ -4,6 +4,10 @@ English | [中文](phase-one.zh.md)
 
 Research date: 2026-10-01. This document records source findings and an implementation recommendation; it does not claim that the product features are implemented.
 
+This is the initial assessment. Current implementation and revised headless-first priorities are recorded in the [POC assessment](headless-poc.md). Team reuse is the current POC choice, not a permanent requirement. The official diff covers one turn, not a cumulative feature delivery.
+
+Update (2026-10-09): this assessment is historical. The implemented POC now targets [DSH 0.2.1-alpha.1](upstream-alpha-assessment.md).
+
 ## Baseline
 
 The latest release is **DSH 0.2.0-rc.2**, published on September 29. The inspected master and release tag both resolve to `639ed015397290b3745d163aafe02ffee4aa3f84`. Our repository already uses this baseline. Official npm packages for the Team bundle, Team service, and workspace-changes are available at `0.2.0-rc.2`; their Cordis peer range accepts our `4.0.4`.
