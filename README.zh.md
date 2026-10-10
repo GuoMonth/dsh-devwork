@@ -41,11 +41,11 @@ dsh --profile devwork-demo --dump-config
 
 测试无需浏览器，覆盖 Host 行为及 Client 注册、文本插入。真实模型与原生桌面验收仍待完成。DSH alpha.2 仍保留公开声明组合类型缺陷，精确、仅开发期的修正在 [POC 评估](docs/headless-poc.zh.md) 中说明。
 
-官方快照在同秒等长修改下的漏报另由 [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7) 跟踪；当前测试采用已有仓库的时间基线，这不是生产修复。
+Host 审查在异步 `open` 完成时取得自有、有界的实际内容基线；开始派发开发工作前必须等待它完成。审查跨 turn 比较起点与当前 checkout，包含已暂存/已提交的改动和删除，排除未再变化的已有 dirty/未跟踪内容。按文件延迟调用的 `reviewDiff` 提供粗粒度文本比较或文件元数据；反馈支持当前侧文本行，以及删除、二进制、可执行位变化和符号链接的整文件评论。
 
-每个回合的 `integrationRoot` 固定在 Leader 原始 Session 目录，并要求官方当前工作目录与之相同。切换目录会清空验收证据、diff 绑定和反馈，即使切回也不会恢复；Devwork 不自动切换 Leader，成员工具仍需显式传入任务 worktree 路径。
+每个回合的 `integrationRoot` 固定在 Leader 原始 Session 目录，并要求官方当前工作目录与之相同。切换目录保留起点基线，但清空验收证据、当前审查和反馈，即使切回也不会恢复；恢复后需重新验收并采集审查。Devwork 不自动切换 Leader，成员工具仍需显式传入任务 worktree 路径。
 
-官方 alpha.2 升级核查见[评估](docs/upstream-alpha-assessment.zh.md)。diff 绑定会拒绝代码变化后的旧快照和被截断的官方文件列表；这不是上游快照漏报修复。
+官方 alpha.2 升级核查见[评估](docs/upstream-alpha-assessment.zh.md)。官方快照同秒等长漏报仍由 [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7) 跟踪，尚未解决。官方 summary 仅作补充，不证明覆盖完整；其漏报或截断不会隐藏 Devwork 自有范围内的内容变化。这是独立的 Host 审查，并非上游修复。采集要求两次读取一致，不自动重试，也不锁定外部写入；上限为 10,000 路径、单文件 8 MiB、总计 64 MiB。新增且仅 ignored 的路径不纳入；遇到 submodule 目录时拒绝采集，不静默跳过。基线路径持续覆盖。详见 [POC 边界](docs/headless-poc.zh.md#已实现的接口)。
 
 ## 打包与发布
 

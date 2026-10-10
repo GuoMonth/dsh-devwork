@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { existsSync } from 'node:fs'
+import fsPromises from 'node:fs/promises'
+import { syncBuiltinESMExports } from 'node:module'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import type { FiberState } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { setTimeout } from 'node:timers/promises'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { workspaceManifest } from '../src/workspace.ts'
 import * as WorkspaceChanges from '@deepseek-ai/dsh-workspace-changes'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import * as Plugin from '../lib/index.js'
@@ -24,7 +29,7 @@ test('owned worktree: real Team edits, committed Leader handoff, verified integr
   try {
     const writer = await teammate(r, 'writer')
     const writing = await task(r)
-    r.ctx.devwork.open(r.lead, { goal: 'Deliver the task and remove its temporary checkout', taskIds: [writing.id], checks: [CHECK] })
+    await r.ctx.devwork.open(r.lead, { goal: 'Deliver the task and remove its temporary checkout', taskIds: [writing.id], checks: [CHECK] })
     const invoke = async (name: string, args: object) => {
       await r.lead.whenIdle()
       r.model.script(r.lead, [tool(name, args), text('Leader task operation settled.')])
@@ -163,7 +168,7 @@ test('failed and canceled worktree creation release the round reservation', { ti
   try {
     const writing = await task(r)
     const contract = { goal: 'Keep pending creation attached to its round', taskIds: [writing.id], checks: [CHECK] }
-    r.ctx.devwork.open(r.lead, contract)
+    await r.ctx.devwork.open(r.lead, contract)
     r.ctx.on('tools/pre-execute', async (exec, next) => {
       if (exec.name === 'bash') return { kind: 'deny', reason: 'Fixture denies worktree creation' }
       return next()
@@ -184,12 +189,12 @@ test('failed and canceled worktree creation release the round reservation', { ti
             await rejected
           }
           assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).cleanupPending.length, 0)
-          assert.doesNotThrow(() => r.ctx.devwork.open(r.lead, contract))
+          await r.ctx.devwork.open(r.lead, contract)
         }
         const aborted = new AbortController()
         aborted.abort()
         assert.throws(() => r.ctx.devwork.createWorktree(r.lead, writing.id, { ...exec, signal: aborted.signal }), /abort/i)
-        assert.doesNotThrow(() => r.ctx.devwork.open(r.lead, contract))
+        await r.ctx.devwork.open(r.lead, contract)
         exercised = true
         return 'Creation failure and cancellation released their reservations.'
       },
@@ -208,7 +213,7 @@ test('real Team + AgentLoop + bash + diff: develop, review, batch feedback, revi
     const reviewer = await teammate(r, 'reviewer')
     const writing = await task(r)
     const reviewing = await r.ctx.agentTeams.createTask(r.lead, { subject: 'Read-only review', description: 'Read the math.ts diff and check zero/negative inputs; report to Leader.', blockedBy: [writing.id], writeScopes: [] })
-    r.ctx.devwork.open(r.lead, { goal: 'Correct addition and make one reviewable result', taskIds: [writing.id, reviewing.id], checks: [CHECK] })
+    await r.ctx.devwork.open(r.lead, { goal: 'Correct addition and make one reviewable result', taskIds: [writing.id, reviewing.id], checks: [CHECK] })
     assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).stage, 'working')
     await assert.rejects(() => r.ctx.agentTeams.updateTask(r.lead, { taskId: reviewing.id, expectedRevision: 1, action: 'claim' }))
 
@@ -285,12 +290,12 @@ test('real Team + AgentLoop + bash + diff: develop, review, batch feedback, revi
   } finally { await r.close() }
 })
 
-test('review binds the official diff to its stopping turn, not a later passing verification', { timeout: 40_000 }, async () => {
+test('owned review stays fresh independently of an old official per-turn diff', { timeout: 40_000 }, async () => {
   const r = await boot()
   try {
     const writing = await task(r)
     await complete(r, writing.id)
-    r.ctx.devwork.open(r.lead, { goal: 'Review the actual current result', taskIds: [writing.id], checks: [CHECK] })
+    await r.ctx.devwork.open(r.lead, { goal: 'Review the actual current result', taskIds: [writing.id], checks: [CHECK] })
     r.model.script(r.lead, [tool('bash', { command: writeCommand(FIXED), description: 'Produce the initial change' }), tool('devwork_verify', {}), text('Initial result verified.')])
     prompt(r.lead, 'Implement and verify the result.')
     await r.lead.whenIdle()
@@ -298,14 +303,18 @@ test('review binds the official diff to its stopping turn, not a later passing v
     assert.deepEqual(first.files, ['math.ts'])
 
     // An external edit precedes a verification-only turn. The official recorder
-    // correctly has no new turn diff, so its old event must not gain a new binding.
+    // correctly has no new turn diff. Owned content evidence must still be current.
     await writeFile(join(r.cwd, 'math.ts'), REVISED)
     r.model.script(r.lead, [tool('devwork_verify', {}), text('New checkout passes, but no fresh diff was produced.')])
     prompt(r.lead, 'Verify the externally revised checkout.')
     await r.lead.whenIdle()
     assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).stage, 'ready-for-review')
     assert.equal(r.lead.session.snapshotEvents().filter(event => event.type === 'workspace/changes').at(-1)?.seq, first.seq)
-    await assert.rejects(() => r.ctx.devwork.review(r.lead, SIGNAL), /changed after the official snapshot/)
+    const independent = await r.ctx.devwork.review(r.lead, SIGNAL)
+    const independentDiff = await r.ctx.devwork.reviewDiff(r.lead, independent, 'math.ts', SIGNAL)
+    assert.ok(independentDiff.kind === 'text')
+    assert.equal(independentDiff.oldText, INITIAL)
+    assert.equal(independentDiff.newText, REVISED)
     await assert.rejects(() => r.ctx.devwork.prepareFeedback(r.lead, first, [{ file: 'math.ts', startLine: 1, endLine: 1, text: 'Comment on the old implementation' }], SIGNAL), /Unknown review snapshot/)
 
     // An unchanged later verification may legitimately reuse the same bound diff.
@@ -326,12 +335,12 @@ test('review binds the official diff to its stopping turn, not a later passing v
   } finally { await r.close() }
 })
 
-test('review refuses a truncated official file list', { timeout: 30_000 }, async () => {
+test('owned review includes files omitted by an official list cap', { timeout: 30_000 }, async () => {
   const r = await boot({ maxFiles: 1 })
   try {
     const writing = await task(r)
     await complete(r, writing.id)
-    r.ctx.devwork.open(r.lead, { goal: 'Never hide changed files in a review', taskIds: [writing.id], checks: [CHECK] })
+    await r.ctx.devwork.open(r.lead, { goal: 'Never hide changed files in a review', taskIds: [writing.id], checks: [CHECK] })
     r.model.script(r.lead, [tool('bash', { command: `${writeCommand(FIXED)} && node -e ${quote("require('node:fs').writeFileSync('result.txt', 'Additional result\\n')")}`, description: 'Change two files with an official one-file summary cap' }), tool('devwork_verify', {}), text('Both files changed and the check passed.')])
     prompt(r.lead, 'Implement and verify both result files.')
     await r.lead.whenIdle()
@@ -341,7 +350,7 @@ test('review refuses a truncated official file list', { timeout: 30_000 }, async
     const summary = r.ctx.workspaceChanges.summary(r.lead.id, event.seq)
     assert.equal(summary?.total, 2)
     assert.equal(summary?.files.length, 1)
-    await assert.rejects(() => r.ctx.devwork.review(r.lead, SIGNAL), /summary is truncated/)
+    assert.deepEqual((await r.ctx.devwork.review(r.lead, SIGNAL)).files, ['math.ts', 'result.txt'])
   } finally { await r.close() }
 })
 
@@ -353,7 +362,7 @@ test('plugin unload cancels and drains in-flight official verification', { timeo
     await complete(r, writing.id)
     const command = `node -e ${quote("require('node:fs').writeFileSync('.sessions/check-started', 'yes'); setTimeout(() => {}, 15000)")}`
     const old = r.ctx.devwork
-    old.open(r.lead, { goal: 'Cancel owned work on disable', taskIds: [writing.id], checks: [command] })
+    await old.open(r.lead, { goal: 'Cancel owned work on disable', taskIds: [writing.id], checks: [command] })
     r.model.script(r.lead, [tool('devwork_verify', {}), text('Verification stopped when the feature unloaded.')])
     prompt(r.lead, 'Run the declared check.')
     await until(() => existsSync(join(r.cwd, '.sessions/check-started')), 'Verification process never started')
@@ -373,7 +382,7 @@ test('completion is not evidence; failed check and edited checkout block readine
   try {
     const writing = await task(r)
     await complete(r, writing.id)
-    r.ctx.devwork.open(r.lead, { goal: 'Verify addition', taskIds: [writing.id], checks: [CHECK] })
+    await r.ctx.devwork.open(r.lead, { goal: 'Verify addition', taskIds: [writing.id], checks: [CHECK] })
     assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).checks[0]?.status, 'not-run')
     r.model.script(r.lead, [tool('devwork_verify', {}), text('Check failed; needs correction.')])
     prompt(r.lead, 'Verify the completed task.')
@@ -397,7 +406,7 @@ test('official pre-execute denial reaches nested verification; no shell-policy b
     const writing = await task(r)
     await complete(r, writing.id)
     await writeFile(join(r.cwd, 'math.ts'), FIXED)
-    r.ctx.devwork.open(r.lead, { goal: 'Respect host policy', taskIds: [writing.id], checks: [CHECK] })
+    await r.ctx.devwork.open(r.lead, { goal: 'Respect host policy', taskIds: [writing.id], checks: [CHECK] })
     let denied = 0
     r.ctx.on('tools/pre-execute', async (exec, next) => {
       if (exec.name === 'bash') { denied++; return { kind: 'deny', reason: 'POC policy denies shell' } }
@@ -429,7 +438,7 @@ test('inactive task owner is attention, not completion; teammate cannot open Lea
     r.model.script(writer, [tool('poc_child_control', {}), tool('team_task_update', { task_id: writing.id, expected_revision: 1, action: 'claim' }), text('Paused; task remains owned.')])
     await r.ctx.agentTeams.sendMessage(r.lead, { target: 'writer', content: [{ type: 'text', text: 'Claim the task, then pause.' }], signal: SIGNAL })
     await until(() => r.ctx.agentTeams.listMembers(r.lead).find(member => member.name === 'writer')?.status === 'inactive', 'Writer did not settle')
-    r.ctx.devwork.open(r.lead, { goal: 'Do not mistake idle for done', taskIds: [writing.id], checks: [CHECK] })
+    await r.ctx.devwork.open(r.lead, { goal: 'Do not mistake idle for done', taskIds: [writing.id], checks: [CHECK] })
     await r.ctx.agentTeams.interrupt(r.lead, 'writer')
     const brief = await r.ctx.devwork.brief(r.lead, SIGNAL)
     assert.equal(brief.completed, 0)
@@ -452,7 +461,7 @@ test('real Cordis lifecycle: pending dependencies, activation, cleanup and react
     assert.equal(fiber.state, ACTIVE)
     const old = r.ctx.devwork
     const writing = await task(r)
-    old.open(r.lead, { goal: 'Test scope lifecycle', taskIds: [writing.id], checks: [CHECK] })
+    await old.open(r.lead, { goal: 'Test scope lifecycle', taskIds: [writing.id], checks: [CHECK] })
     assert.ok(r.ctx.tools.get('devwork_open'))
     await changes.dispose()
     await until(() => fiber.state === PENDING, 'Devwork did not suspend on dependency loss')
@@ -489,7 +498,7 @@ async function directoryInvoke(r: Awaited<ReturnType<typeof boot>>, name: string
 async function directoryReady(r: Awaited<ReturnType<typeof boot>>) {
   const writing = await task(r)
   await complete(r, writing.id)
-  const roundId = r.ctx.devwork.open(r.lead, { goal: 'Bind acceptance to the original project', taskIds: [writing.id], checks: [CHECK] })
+  const roundId = await r.ctx.devwork.open(r.lead, { goal: 'Bind acceptance to the original project', taskIds: [writing.id], checks: [CHECK] })
   r.model.script(r.lead, [tool('bash', { command: writeCommand(FIXED), description: 'Produce the reviewed change' }), tool('devwork_verify', {}), text('Result ready.')])
   prompt(r.lead, 'Implement and verify this fixture.')
   await r.lead.whenIdle()
@@ -529,13 +538,16 @@ test('directory guard: missing-directory recovery preserves root identity but ca
     assert.equal(snapshot.integrationRoot, r.cwd)
     assert.ok('integrationRoot' in batch)
     assert.equal(batch.integrationRoot, r.cwd)
-    await assert.rejects(async () => r.ctx.devwork.review(r.lead, SIGNAL), /snapshot/i)
+    await assert.rejects(async () => r.ctx.devwork.review(r.lead, SIGNAL), /not ready/i)
     await assert.rejects(async () => r.ctx.devwork.prepareFeedback(r.lead, snapshot, DIRECTORY_COMMENT, SIGNAL), /snapshot/i)
     await assert.rejects(async () => r.ctx.devwork.sendFeedback(r.lead, batch.id, SIGNAL), /batch/i)
     const verified = await directoryInvoke(r, 'devwork_verify')
     assert.ok(!verified.isError, JSON.stringify(verified.content))
     assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).stage, 'ready-for-review')
-    await assert.rejects(async () => r.ctx.devwork.review(r.lead, SIGNAL), /snapshot/i)
+    const refreshed = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.deepEqual(refreshed.files, ['math.ts'])
+    assert.equal(refreshed.baselineFingerprint, snapshot.baselineFingerprint)
+    assert.notEqual(refreshed.id, snapshot.id)
     await assert.rejects(async () => r.ctx.devwork.sendFeedback(r.lead, batch.id, SIGNAL), /batch/i)
   } finally { await r.close(); await rm(other, { recursive: true, force: true }) }
 })
@@ -615,7 +627,7 @@ test('directory guard: an away-and-back switch during verification invalidates i
   } finally { await r.close(); await rm(other, { recursive: true, force: true }) }
 })
 
-test('directory guard: foreign or unfingerprinted summary paths refuse review and feedback', { timeout: 40_000 }, async t => {
+test('directory guard: supplemental foreign paths refuse, ignored-only paths are not promoted', { timeout: 40_000 }, async t => {
   const r = await boot()
   try {
     const { snapshot, batch } = await directoryReady(r)
@@ -629,12 +641,14 @@ test('directory guard: foreign or unfingerprinted summary paths refuse review an
         : { ...summary, files: summary.files.map(file => ({ ...file, path: outsideFile ?? file.path })) }
     })
     await writeFile(join(r.cwd, '.sessions/ignored.txt'), 'Ignored files are outside verification coverage.\n')
-    for (const foreignPath of [undefined, join(tmpdir(), 'external.ts'), '../escape.ts', '.sessions/ignored.txt']) {
+    for (const foreignPath of [undefined, join(tmpdir(), 'external.ts'), '../escape.ts']) {
       outsideFile = foreignPath
       await assert.rejects(async () => r.ctx.devwork.review(r.lead, SIGNAL), DIRECTORY_MISMATCH)
       await assert.rejects(async () => r.ctx.devwork.prepareFeedback(r.lead, snapshot, DIRECTORY_COMMENT, SIGNAL), DIRECTORY_MISMATCH)
       await assert.rejects(async () => r.ctx.devwork.sendFeedback(r.lead, batch.id, SIGNAL), DIRECTORY_MISMATCH)
     }
+    outsideFile = '.sessions/ignored.txt'
+    assert.deepEqual((await r.ctx.devwork.review(r.lead, SIGNAL)).files, ['math.ts'])
   } finally { t.mock.restoreAll(); await r.close() }
 })
 
@@ -645,7 +659,7 @@ test('directory guard: a switch after successful cleanup does not retain a phant
   try {
     const writing = await task(r, 'No-op delivery with an auditable handoff')
     await complete(r, writing.id)
-    r.ctx.devwork.open(r.lead, { goal: 'Keep cleanup bookkeeping consistent after directory changes', taskIds: [writing.id], checks: ['node -e "process.exit(0)"'] })
+    await r.ctx.devwork.open(r.lead, { goal: 'Keep cleanup bookkeeping consistent after directory changes', taskIds: [writing.id], checks: ['node -e "process.exit(0)"'] })
     const created = await directoryInvoke(r, 'devwork_worktree', { taskId: writing.id })
     assert.ok(!created.isError, JSON.stringify(created.content))
     const block = created.content.find(content => content.type === 'text')
@@ -679,7 +693,7 @@ test('directory guard: a switch after successful cleanup does not retain a phant
     assert.match(JSON.stringify(result.content), /working directory changed/i)
     assert.deepEqual((await r.ctx.devwork.brief(r.lead, SIGNAL)).cleanupPending, [], 'Successful removal retires ownership before rejecting the stale operation')
     assert.ok(checkout !== undefined && !existsSync(checkout))
-    assert.doesNotThrow(() => r.ctx.devwork.open(r.lead, { goal: 'A new round after completed cleanup', taskIds: [writing.id], checks: [CHECK] }))
+    await r.ctx.devwork.open(r.lead, { goal: 'A new round after completed cleanup', taskIds: [writing.id], checks: [CHECK] })
   } finally {
     t.mock.restoreAll()
     await r.close()
@@ -694,7 +708,7 @@ test('directory guard: worktree creation refuses a permission-time ABA switch be
   const other = await mkdtemp(join(tmpdir(), 'devwork-create-aba-'))
   try {
     const writing = await task(r)
-    r.ctx.devwork.open(r.lead, { goal: 'Never create a worktree after directory authorization went stale', taskIds: [writing.id], checks: [CHECK] })
+    await r.ctx.devwork.open(r.lead, { goal: 'Never create a worktree after directory authorization went stale', taskIds: [writing.id], checks: [CHECK] })
     let switched = false
     let bashBodies = 0
     r.ctx.on('tools/execute', async (exec, next) => {
@@ -719,7 +733,7 @@ test('directory guard: worktree creation refuses a permission-time ABA switch be
     const ordinary = await directoryInvoke(r, 'bash', { command: 'node -e "process.exit(0)"', description: 'An unrelated Bash call after the scoped guard is disposed' })
     assert.ok(!ordinary.isError, JSON.stringify(ordinary.content))
     assert.equal(bashBodies, 1, 'A denied Devwork call must not retain a global Bash denial')
-    assert.doesNotThrow(() => r.ctx.devwork.open(r.lead, { goal: 'Creation reservation was released', taskIds: [writing.id], checks: [CHECK] }))
+    await r.ctx.devwork.open(r.lead, { goal: 'Creation reservation was released', taskIds: [writing.id], checks: [CHECK] })
   } finally {
     // Also remove a fixture checkout if the regression reintroduces the mutation.
     const extra = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: r.cwd, encoding: 'utf8' })
@@ -728,4 +742,314 @@ test('directory guard: worktree creation refuses a permission-time ABA switch be
     await rm(other, { recursive: true, force: true })
     for (const path of extra) await rm(path, { recursive: true, force: true })
   }
+})
+
+test('cumulative review retains earlier turns and includes a partial official omission', { timeout: 40_000 }, async t => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    await writeFile(join(r.cwd, 'user-untracked.txt'), 'Already here.\n')
+    await r.ctx.devwork.open(r.lead, { goal: 'Review the complete development round', taskIds: [writing.id], checks: [CHECK] })
+    r.model.script(r.lead, [tool('bash', { command: writeCommand(FIXED), description: 'First result' }), tool('devwork_verify', {}), text('First turn.')])
+    prompt(r.lead, 'Implement the first result.')
+    await r.lead.whenIdle()
+    r.model.script(r.lead, [tool('bash', { command: `${writeCommand(REVISED)} && node -e ${quote("require('node:fs').writeFileSync('second.txt', 'Second result\\n')")}`, description: 'Second result' }), tool('devwork_verify', {}), text('Second turn.')])
+    prompt(r.lead, 'Implement the second result.')
+    await r.lead.whenIdle()
+    const original = r.ctx.workspaceChanges.summary.bind(r.ctx.workspaceChanges)
+    t.mock.method(r.ctx.workspaceChanges, 'summary', (...args: Parameters<typeof original>) => {
+      const summary = original(...args)
+      return summary === undefined ? undefined : { ...summary, files: summary.files.filter(file => file.path === 'second.txt'), total: 1 }
+    })
+    assert.deepEqual((await r.ctx.devwork.review(r.lead, SIGNAL)).files, ['math.ts', 'second.txt'])
+  } finally { t.mock.restoreAll(); await r.close() }
+})
+
+test('cumulative review supports committed deletion and excludes preexisting dirty contents', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    await r.ctx.devwork.open(r.lead, { goal: 'Review a deletion', taskIds: [writing.id], checks: ['node -e "process.exit(0)"'] })
+    r.model.script(r.lead, [tool('bash', { command: "git rm -- math.ts && git -c user.name=POC -c user.email=poc@example.invalid -c commit.gpgsign=false commit -m deletion", description: 'Commit the deletion' }), tool('devwork_verify', {}), text('Deleted.')])
+    prompt(r.lead, 'Delete this file.')
+    await r.lead.whenIdle()
+    assert.deepEqual((await r.ctx.devwork.review(r.lead, SIGNAL)).files, ['math.ts'])
+  } finally { await r.close() }
+})
+
+test('round baseline excludes existing dirty/untracked bytes, preserves edits across no-op turns and removes reverts', { timeout: 40_000 }, async () => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    await writeFile(join(r.cwd, 'existing.txt'), 'User baseline\n')
+    await r.ctx.devwork.open(r.lead, { goal: 'Accumulate actual content only', taskIds: [writing.id], checks: ['node -e "process.exit(0)"'] })
+    await writeFile(join(r.cwd, 'README.md'), 'User baseline plus new work\n')
+    await writeFile(join(r.cwd, 'existing.txt'), 'Changed after start\n')
+    await directoryInvoke(r, 'devwork_verify')
+    const first = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.deepEqual(first.files, ['README.md', 'existing.txt'])
+    const diff = await r.ctx.devwork.reviewDiff(r.lead, first, 'README.md', SIGNAL)
+    assert.ok(diff.kind === 'text')
+    assert.equal(diff.oldText, 'Existing user edit; preserve me.\n')
+    assert.equal(diff.newText, 'User baseline plus new work\n')
+    await directoryInvoke(r, 'devwork_verify')
+    const second = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.deepEqual(second.files, first.files)
+    assert.notEqual(second.id, first.id)
+    await assert.rejects(() => r.ctx.devwork.reviewDiff(r.lead, first, 'README.md', SIGNAL), /Unknown review snapshot/)
+    await writeFile(join(r.cwd, 'README.md'), 'Existing user edit; preserve me.\n')
+    await writeFile(join(r.cwd, 'existing.txt'), 'User baseline\n')
+    await directoryInvoke(r, 'devwork_verify')
+    assert.deepEqual((await r.ctx.devwork.review(r.lead, SIGNAL)).files, [])
+  } finally { await r.close() }
+})
+
+test('deletion file feedback covers unstaged, staged and committed states with stable content identity', { timeout: 40_000 }, async () => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    await r.ctx.devwork.open(r.lead, { goal: 'Review every deletion state', taskIds: [writing.id], checks: ['node -e "process.exit(0)"'] })
+    await rm(join(r.cwd, 'math.ts'))
+    await directoryInvoke(r, 'devwork_verify')
+    const snapshot = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.deepEqual(snapshot.files, ['math.ts'])
+    const diff = await r.ctx.devwork.reviewDiff(r.lead, snapshot, 'math.ts', SIGNAL)
+    assert.ok(diff.kind === 'text')
+    assert.equal(diff.oldText, INITIAL)
+    assert.deepEqual(diff.after, { kind: 'absent' })
+    const batch = await r.ctx.devwork.prepareFeedback(r.lead, snapshot, [{ kind: 'file', file: 'math.ts', text: 'Explain why deletion is safe.' }], SIGNAL)
+    assert.match(batch.prompt, /"kind": "absent"/)
+    await assert.rejects(() => r.ctx.devwork.prepareFeedback(r.lead, snapshot, [{ file: 'math.ts', startLine: 1, endLine: 1, text: 'Invented new line' }], SIGNAL), /use file feedback/)
+    execFileSync('git', ['add', '-u', '--', 'math.ts'], { cwd: r.cwd })
+    assert.deepEqual((await r.ctx.devwork.reviewDiff(r.lead, snapshot, 'math.ts', SIGNAL)).after, { kind: 'absent' })
+    execFileSync('git', ['-c', 'user.name=POC', '-c', 'user.email=poc@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-m', 'Delete result'], { cwd: r.cwd })
+    assert.deepEqual((await r.ctx.devwork.reviewDiff(r.lead, snapshot, 'math.ts', SIGNAL)).after, { kind: 'absent' })
+    await writeFile(join(r.cwd, 'math.ts'), INITIAL)
+    await assert.rejects(() => r.ctx.devwork.sendFeedback(r.lead, batch.id, SIGNAL), /Stale feedback/)
+    await assert.rejects(() => r.ctx.devwork.reviewDiff(r.lead, snapshot, 'math.ts', SIGNAL), /Stale review/)
+  } finally { await r.close() }
+})
+
+test('owned comparison preserves missing, empty, binary, mode, symlink and final-newline identities', { timeout: 40_000 }, async () => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    await writeFile(join(r.cwd, 'empty.txt'), '')
+    await writeFile(join(r.cwd, 'mode.txt'), 'mode\n')
+    await writeFile(join(r.cwd, 'newline.txt'), 'same\n')
+    await symlink('math.ts', join(r.cwd, 'link'))
+    await r.ctx.devwork.open(r.lead, { goal: 'Keep content identities honest', taskIds: [writing.id], checks: ['node -e "process.exit(0)"'] })
+    await rm(join(r.cwd, 'empty.txt'))
+    await chmod(join(r.cwd, 'mode.txt'), 0o755)
+    await writeFile(join(r.cwd, 'newline.txt'), 'same')
+    await writeFile(join(r.cwd, 'binary.bin'), Buffer.from([0, 255, 1]))
+    await writeFile(join(r.cwd, 'invalid.txt'), Buffer.from([255]))
+    await rm(join(r.cwd, 'link'))
+    await symlink('/outside/not-read', join(r.cwd, 'link'))
+    await writeFile(join(r.cwd, 'new-empty.txt'), '')
+    await directoryInvoke(r, 'devwork_verify')
+    const snapshot = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.deepEqual(snapshot.files, ['binary.bin', 'empty.txt', 'invalid.txt', 'link', 'mode.txt', 'new-empty.txt', 'newline.txt'])
+    const newline = await r.ctx.devwork.reviewDiff(r.lead, snapshot, 'newline.txt', SIGNAL)
+    assert.ok(newline.kind === 'text')
+    assert.equal(newline.oldText, 'same\n')
+    assert.equal(newline.newText, 'same')
+    for (const file of ['binary.bin', 'invalid.txt', 'link', 'mode.txt', 'empty.txt', 'new-empty.txt']) {
+      await r.ctx.devwork.prepareFeedback(r.lead, snapshot, [{ kind: 'file', file, text: 'Review file metadata.' }], SIGNAL)
+      await assert.rejects(() => r.ctx.devwork.prepareFeedback(r.lead, snapshot, [{ file, startLine: 1, endLine: 1, text: 'No line anchor' }], SIGNAL))
+    }
+    assert.equal((await r.ctx.devwork.reviewDiff(r.lead, snapshot, 'binary.bin', SIGNAL)).kind, 'metadata')
+    assert.deepEqual((await r.ctx.devwork.reviewDiff(r.lead, snapshot, 'link', SIGNAL)).after, { kind: 'symlink', target: '/outside/not-read' })
+  } finally { await r.close() }
+})
+
+test('owned review ignores supplemental expiry and net-zero create/delete without swallowing current changes', { timeout: 30_000 }, async t => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    await r.ctx.devwork.open(r.lead, { goal: 'Review net changes', taskIds: [writing.id], checks: [CHECK] })
+    await directoryInvoke(r, 'bash', { command: `${writeCommand(FIXED)} && node -e ${quote("require('node:fs').writeFileSync('temporary.txt', 'temporary')")}`, description: 'Create temporary result' })
+    await directoryInvoke(r, 'bash', { command: 'rm temporary.txt', description: 'Revert temporary result' })
+    await directoryInvoke(r, 'devwork_verify')
+    assert.deepEqual((await r.ctx.devwork.review(r.lead, SIGNAL)).files, ['math.ts'])
+    t.mock.method(r.ctx.workspaceChanges, 'summary', () => undefined)
+    assert.deepEqual((await r.ctx.devwork.review(r.lead, SIGNAL)).files, ['math.ts'])
+  } finally { t.mock.restoreAll(); await r.close() }
+})
+
+test('open reserves pending capture, waits before tool mutation, and preserves prior baseline on failure', { timeout: 40_000 }, async () => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    const contract = { goal: 'Capture before writing', taskIds: [writing.id], checks: [CHECK] }
+    const opening = r.ctx.devwork.open(r.lead, contract)
+    assert.throws(() => r.ctx.devwork.open(r.lead, contract), /pending baseline/)
+    assert.throws(() => r.ctx.devwork.brief(r.lead, SIGNAL), /baseline is not ready/)
+    r.model.script(r.lead, [tool('bash', { command: writeCommand(FIXED), description: 'Must wait for baseline' }), tool('devwork_verify', {}), text('Settled.')])
+    prompt(r.lead, 'Write after capturing the baseline.')
+    const id = await opening
+    await r.lead.whenIdle()
+    const snapshot = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.deepEqual(snapshot.files, ['math.ts'])
+    const aborted = new AbortController()
+    aborted.abort(new Error('Pre-aborted baseline'))
+    assert.throws(() => r.ctx.devwork.open(r.lead, contract, aborted.signal), /Pre-aborted/)
+    assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).roundId, id)
+    await writeFile(join(r.cwd, 'oversized'), '')
+    await truncate(join(r.cwd, 'oversized'), 8 * 1024 * 1024 + 1)
+    await assert.rejects(() => r.ctx.devwork.open(r.lead, contract), /size limit/)
+    await rm(join(r.cwd, 'oversized'))
+    assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).roundId, id)
+    assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).checks[0]?.status, 'not-run')
+    await directoryInvoke(r, 'devwork_verify')
+    const restored = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.equal(restored.baselineFingerprint, snapshot.baselineFingerprint)
+    assert.deepEqual(restored.files, ['math.ts'])
+    const controller = new AbortController()
+    const canceling = r.ctx.devwork.open(r.lead, contract, controller.signal)
+    controller.abort(new Error('Cancel pending baseline'))
+    await assert.rejects(canceling)
+    assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).roundId, id)
+    assert.ok(!(await directoryInvoke(r, 'devwork_open', contract)).isError, 'Opening through the real tool pipeline must not await itself')
+  } finally { await r.close() }
+})
+
+test('ordinary non-Team subagent tools are unaffected by the baseline barrier', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  try {
+    const childId = SessionId('ordinary-child')
+    let executed = false
+    r.ctx.tools.register(defineTool({ name: 'poc_ordinary', description: 'Ordinary child tool', parameters: {},
+      output: { schema: { type: 'boolean' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+      execute: async (_args, exec) => {
+        assert.ok(exec.agent)
+        assert.equal(r.ctx.agentTeams.tryMembership(exec.agent), undefined)
+        executed = true
+        return true
+      },
+    }))
+    r.model.script({ id: childId }, [tool('poc_ordinary', {}), text('Ordinary child done.')])
+    const activation = await r.ctx.subagents.startActivation({ provider: 'spawn', label: 'Ordinary child', childId,
+      request: { parent: r.lead, prompt: [{ type: 'text', text: 'Call the fixture tool.' }] }, signal: SIGNAL, delivery: 'caller' })
+    await activation.result
+    assert.equal(executed, true)
+  } finally { await r.close() }
+})
+
+test('capture refuses oversized files, unsafe ancestors and non-UTF8 filenames; retained paths survive ignore changes', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  const outside = await mkdtemp(join(tmpdir(), 'devwork-outside-'))
+  try {
+    await writeFile(join(r.cwd, 'retained.txt'), 'Retain me\n')
+    const baseline = await workspaceManifest(r.cwd, SIGNAL)
+    await writeFile(join(r.cwd, '.gitignore'), '.sessions/\nretained.txt\n')
+    assert.equal((await workspaceManifest(r.cwd, SIGNAL, [...baseline.entries.keys()])).entries.has('retained.txt'), true)
+    await mkdir(join(r.cwd, 'nested'))
+    await writeFile(join(r.cwd, 'nested/file.txt'), 'inside\n')
+    execFileSync('git', ['add', '--', 'nested/file.txt'], { cwd: r.cwd })
+    await rm(join(r.cwd, 'nested'), { recursive: true })
+    await writeFile(join(outside, 'file.txt'), 'outside private bytes\n')
+    await symlink(outside, join(r.cwd, 'nested'))
+    await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /ancestor/)
+    await rm(join(r.cwd, 'nested'))
+    execFileSync('git', ['reset', '--', 'nested/file.txt'], { cwd: r.cwd })
+    const invalidPath = Buffer.concat([Buffer.from(r.cwd + '/invalid-'), Buffer.from([255])])
+    await writeFile(invalidPath, 'Must not silently omit\n')
+    await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /lossless UTF-8/)
+    await rm(invalidPath)
+  } finally { await r.close(); await rm(outside, { recursive: true, force: true }) }
+})
+
+test('fresh same-size real official capture cannot hide cumulative content changes', { timeout: 30_000 }, async t => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    // Deliberately fresh write/add, not an aged fixture and not a retry for #7.
+    await setTimeout(1010 - Date.now() % 1000)
+    await writeFile(join(r.cwd, 'math.ts'), INITIAL)
+    execFileSync('git', ['add', '--', 'math.ts'], { cwd: r.cwd })
+    const indexBefore = await readFile(join(r.cwd, '.git/index'))
+    await r.ctx.devwork.open(r.lead, { goal: 'Do not trust a partial official list', taskIds: [writing.id], checks: [CHECK] })
+    r.model.script(r.lead, [tool('bash', { command: `${writeCommand(FIXED)} && node -e ${quote("require('node:fs').writeFileSync('extra.txt', 'Visible extra result\\n')")}`, description: 'Same-size tracked edit and new file' }), tool('devwork_verify', {}), text('Result.')])
+    prompt(r.lead, 'Make both changes and verify.')
+    await r.lead.whenIdle()
+    const event = r.lead.session.snapshotEvents().filter(event => event.type === 'workspace/changes').at(-1)
+    const official = event === undefined ? undefined : r.ctx.workspaceChanges.summary(r.lead.id, event.seq)
+    const snapshot = await r.ctx.devwork.review(r.lead, SIGNAL)
+    assert.deepEqual(snapshot.files, ['extra.txt', 'math.ts'])
+    assert.ok(indexBefore.equals(await readFile(join(r.cwd, '.git/index'))), 'Read-only capture preserves user index')
+    t.diagnostic(JSON.stringify({ officialFiles: official?.files.map(file => file.path) ?? [], ownedFiles: snapshot.files, upstreamMissObserved: !official?.files.some(file => file.path === 'math.ts') }))
+  } finally { await r.close() }
+})
+
+test('plugin unload cancels pending baseline without resurrecting a round', { timeout: 20_000 }, async () => {
+  const r = await boot()
+  try {
+    assert.ok(r.pluginFiber)
+    const writing = await task(r)
+    const old = r.ctx.devwork
+    const opening = old.open(r.lead, { goal: 'Cancel capture', taskIds: [writing.id], checks: [CHECK] })
+    const rejected = assert.rejects(opening)
+    await r.pluginFiber.dispose()
+    await rejected
+    assert.equal(r.ctx.get('devwork'), undefined)
+    assert.throws(() => old.brief(r.lead, SIGNAL), /unloaded/)
+  } finally { await r.close() }
+})
+
+test('capture caps file count and total bytes without silently omitting oversized scope', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  try {
+    for (let i = 0; i < 9; i++) {
+      const path = join(r.cwd, `large-${i}`)
+      await writeFile(path, '')
+      await truncate(path, 8 * 1024 * 1024)
+    }
+    await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /byte limit/)
+    for (let i = 0; i < 9; i++) await rm(join(r.cwd, `large-${i}`))
+    const empty = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: r.cwd, input: '', encoding: 'utf8' }).trim()
+    const entries = Array.from({ length: 10_001 }, (_, i) => `100644 ${empty}\tmissing-${i}\n`).join('')
+    execFileSync('git', ['update-index', '--index-info'], { cwd: r.cwd, input: entries })
+    await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /file limit/)
+  } finally { await r.close() }
+})
+
+test('capture fails closed on a deterministic change between reads and on post-lstat growth', { timeout: 30_000 }, async t => {
+  const r = await boot()
+  try {
+    const originalRealpath = fsPromises.realpath
+    let reads = 0
+    t.mock.method(fsPromises, 'realpath', async (...args: Parameters<typeof originalRealpath>) => {
+      const value = await originalRealpath(...args)
+      if (args[0] === r.cwd && ++reads === 2) await writeFile(join(r.cwd, 'math.ts'), FIXED)
+      return value
+    })
+    syncBuiltinESMExports()
+    await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /changed during content capture/)
+    assert.equal(reads, 2, 'No automatic retry conceals unstable scope')
+    t.mock.restoreAll()
+    syncBuiltinESMExports()
+    await writeFile(join(r.cwd, 'growing.txt'), 'small')
+    const originalLstat = fsPromises.lstat
+    let grew = false
+    t.mock.method(fsPromises, 'lstat', async (...args: Parameters<typeof originalLstat>) => {
+      const value = await originalLstat(...args)
+      if (args[0] === join(r.cwd, 'growing.txt') && !grew) {
+        grew = true
+        await truncate(join(r.cwd, 'growing.txt'), 8 * 1024 * 1024 + 1)
+      }
+      return value
+    })
+    syncBuiltinESMExports()
+    await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /size limit/)
+    assert.equal(grew, true)
+  } finally { t.mock.restoreAll(); syncBuiltinESMExports(); await r.close() }
 })
