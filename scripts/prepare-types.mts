@@ -2,13 +2,13 @@ import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { record, parseJson } from './data.mts'
 
-// alpha.1 still indexes the Host state map with Client keys, as rc.2 did.
+// alpha.2 still indexes the Host state map with Client keys, as rc.2 did.
 // Some public entries expose the Client key without the private Host state.
 // Intersect the keys: preserve every constraint and keep skipLibCheck=false.
 // Development-only declaration correction; no runtime/package output changes.
 const root = new URL('../node_modules/@deepseek-ai/dsh-session-projection/', import.meta.url)
 const metadata = record(parseJson(readFileSync(new URL('package.json', root), 'utf8')))
-assert.equal(metadata.version, '0.2.1-alpha.1', 'Reassess the declaration correction on a DSH upgrade')
+assert.equal(metadata.version, '0.2.1-alpha.2', 'Reassess the declaration correction on a DSH upgrade')
 const file = new URL('lib/types/index.d.ts', root)
 const original = 'register<K extends keyof SessionProjectionMap, S extends SessionProjectionStateMap[K]>'
 const corrected = 'register<K extends keyof SessionProjectionMap & keyof SessionProjectionStateMap, S extends SessionProjectionStateMap[K]>'

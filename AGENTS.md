@@ -5,6 +5,8 @@
 - Use strict TypeScript 7 for all first-party code, including scripts. Validate external data from unknown; do not bypass checks with explicit any, blanket casts, or suppression comments. Favor clear types over elaborate type-level machinery.
 - Absorb Orca's engineering and interaction lessons; do not copy Orca source or depend on its runtime/services.
 - Preserve one primary Leader conversation. Favor a small useful coding/review flow over a general orchestration platform.
+- Fix each round to the Leader’s original Session directory and require the official workingDirectory to match. Never switch the Leader automatically. Directory-change events invalidate checks, diff bindings and feedback even after restoration; guard in-flight operations and verify official summary.cwd.
+- Preserve the synchronous pending-creation reservation: a round with worktree creation in flight or an owned lease cannot be replaced. Explicit task workdirs are not automatic per-member allocation or enforced isolation.
 - Temporary task worktrees belong to the delivery lifecycle: integrate committed results, commit a concise Leader summary, verify the target checkout, then remove the owned worktree without force. Keep unfinished/unintegrated work visible; never archive checkout copies in the repository.
 - Remote execution, mobile, email, and automatic crash recovery are outside the first phase.
 - Do not hide the known fresh-index/same-second snapshot miss with retries. Keep the aged fixture baseline and diagnostic mode explicit; passing normal tests is not a production fix.
@@ -13,7 +15,7 @@
 - Use dependency injection for consumed services and Cordis effects for resources. Never import another feature's private UI components.
 - If adding a browser entry, isolate Host and Client TypeScript configurations and use documented DSH slots.
 - Acceptance commands must go through the official tool pipeline; retain permission, cancellation, and final-result semantics.
-- Keep the alpha.1 declaration correction (retained from rc.2) narrow and development-only. Reassess it on an upstream upgrade; do not disable library checking.
+- Keep the alpha.2 declaration correction (retained from rc.2) narrow and development-only. Reassess it on an upstream upgrade; do not disable library checking.
 - Keep README.md/README.zh.md, docs/releasing.md/docs/releasing.zh.md, and locale/en.json/locale/zh.json in sync.
 - Keep user needs/feedback (kind:request) separate from implementation/maintenance (kind:development), using one category per issue. Link product development tasks to their requests. PRs close development tasks; close requests only when user acceptance is satisfied. Follow CONTRIBUTING.md.
 - Run npm run verify and npm pack --dry-run for package changes. Add behavioral tests when actual product behavior is introduced.

@@ -31,11 +31,11 @@ Devwork-Source: <source-commit-sha>
 
 执行使用官方 `tools.execute → bash`，继承权限、取消和最终结果语义。删除用 `git worktree remove`，没有 `--force`、`rm -rf` 或分支清理。ignored 的构建/依赖文件遵循 Git 临时 checkout 的删除语义，不当作应归档的交付成果。
 
-缺少任一证明就保留 checkout，由 Leader 汇总具体原因。正在验证、dirty、未整合与 unknown worktree 不会被当作任务结束自动擦除。并发清理只允许一个操作成功；已有用户文件、分支与其他 worktree 不纳入本项目清理范围。
+缺少任一证明就保留 checkout，由 Leader 汇总具体原因。正在验证、dirty、未整合与 unknown worktree 不会被当作任务结束自动擦除。并发清理只允许一个操作成功。同步登记的创建中预留与已有 ownership lease 阻止在创建/自有交付未收尾时替换回合；目录变化使旧证据和反馈失效，切回也不恢复，运行中守卫拒绝跨越该变化的操作。已有用户文件、分支与其他 worktree 不纳入本项目清理范围。
 
 ## 官方能力与当前限制
 
-核查的 rc.2 `SpawnTeammateRequest` 没有逐成员 cwd 参数，标准 Team 成员继承主工作区。上述流程通过每次工具显式使用路径验证，**不是自动切换成员 Session cwd，也不是强制文件访问隔离**。下一步若真实模型经常漏传路径，应再评估官方 Agent/provider 组合；不靠修改私有 Session header 实现。
+alpha.2 官方 working-directory 服务可改变有效 cwd，但 Devwork 不自动分配或切换成员目录；Leader 整合根目录固定在原始 Session 目录。标准 Team 创建不等于任务 worktree 自动路由。上述流程通过每次工具显式使用路径验证，**不是自动切换成员 Session cwd，也不是强制文件访问隔离**。下一步若真实模型经常漏传路径，应再评估官方 Agent/provider 组合；不靠修改私有 Session header 实现。
 
 当前清理以 ancestry 为证明，支持 fast-forward/普通 merge。squash、cherry-pick、放弃有未整合成果的任务，尚无自动清理路径；没有用提示词中的“已经合并”替代 Git 证明。工具不授予模型新的提交、合并或人类验收权限。
 

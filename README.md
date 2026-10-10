@@ -19,7 +19,7 @@ The [headless POC assessment](docs/headless-poc.md) records the implementation, 
 
 ## Develop and try the bundle
 
-Baseline: DSH **0.2.1-alpha.1**, Cordis **4.0.5-alpha.1**. Use **Node.js 24.x only**; the minor/patch version is not fixed. CI and releases use Node 24. All source and development scripts use **strict TypeScript 7.0.2**, with unchecked indexed access and exact optional property checks enabled.
+Baseline: DSH **0.2.1-alpha.2**, Cordis **4.0.5-alpha.1**. Use **Node.js 24.x only**; the minor/patch version is not fixed. CI and releases use Node 24. All source and development scripts use **strict TypeScript 7.0.2**, with unchecked indexed access and exact optional property checks enabled.
 
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git
@@ -30,7 +30,7 @@ npm run pack:check
 npm pack
 ```
 
-In the DSH desktop Plugins page, use the local package directory as an installation source. Enable Devwork and the official opt-in Agent Teams bundle. The Host also needs official tools, a Bash provider, system prompt, and workspace-changes. Missing services leave Devwork pending. The input action inserts an editable request and never submits it automatically. For CLI validation with an installed DSH CLI, from the directory above the checkout:
+In the DSH desktop Plugins page, use the local package directory as an installation source. Enable Devwork and the official opt-in Agent Teams bundle. The Host also needs official tools, a Bash provider, system prompt, workspace-changes, and working-directory. Missing services leave Devwork pending. The input action inserts an editable request and never submits it automatically. For CLI validation with an installed DSH CLI, from the directory above the checkout:
 
 ```sh
 dsh plugin --profile devwork-demo add ./dsh-devwork
@@ -39,11 +39,13 @@ dsh --profile devwork-demo --dump-config
 
 The output should include the Devwork bundle layer and the `guomonth-devwork` row. This CLI profile is an installation check, not a separate desktop application.
 
-The test suite checks Host behavior and Client registration/insertion without a browser. The real-model and native desktop acceptance checks remain open. DSH alpha.1 retains a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
+The test suite checks Host behavior and Client registration/insertion without a browser. The real-model and native desktop acceptance checks remain open. DSH alpha.2 retains a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
 
 Same-second equal-size official snapshot misses are tracked in [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7); the existing-repository test baseline is not a production fix.
 
-Official alpha.1 upgrade findings: [assessment](docs/upstream-alpha-assessment.md). Diff bindings reject changed checkouts and truncated official file lists; they do not fix upstream snapshot omissions.
+Each round keeps a fixed `integrationRoot` at the Leader’s original Session directory. The current official working directory must match it. Changing directories clears acceptance evidence, diff bindings and feedback, even after switching back; Devwork never switches the Leader automatically. Member tools must still receive explicit task-worktree paths.
+
+Official alpha.2 upgrade findings: [assessment](docs/upstream-alpha-assessment.md). Diff bindings reject changed checkouts and truncated official file lists; they do not fix upstream snapshot omissions.
 
 ## Package and release
 
