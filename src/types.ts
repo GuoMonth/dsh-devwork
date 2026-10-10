@@ -14,6 +14,8 @@ export interface CheckEvidence {
 }
 export interface DevelopmentBrief {
   roundId: string
+  /** Fixed Leader integration directory for this round. */
+  integrationRoot: string
   goal: string
   stage: 'working' | 'needs-attention' | 'ready-for-review'
   completed: number
@@ -25,6 +27,8 @@ export interface DevelopmentBrief {
 }
 export interface ReviewSnapshot {
   roundId: string
+  /** Fixed Leader integration directory for this round. */
+  integrationRoot: string
   /** Sequence of the official workspace/changes event. */
   seq: number
   fingerprint: string
@@ -40,6 +44,8 @@ export interface ReviewComment {
 export interface FeedbackBatch {
   id: string
   roundId: string
+  /** Fixed Leader integration directory for this round. */
+  integrationRoot: string
   seq: number
   fingerprint: string
   prompt: string

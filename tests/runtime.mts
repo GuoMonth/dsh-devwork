@@ -101,7 +101,7 @@ export async function boot(options: { plugin?: boolean; changes?: boolean; maxFi
     git('add', '-A'); git('commit', '-q', '-m', 'fixture baseline')
     // This dirty content must not be attributed to the Agent round.
     await writeFile(join(cwd, 'README.md'), 'Existing user edit; preserve me.\n')
-    await mountAgentLoopTestDependencies(ctx, { tools: { mode: 'native' } })
+    await mountAgentLoopTestDependencies(ctx, { tools: { mode: 'native' }, workingDirectory: true })
     await ctx.plugin(JsonlSessionPersistence, { root: join(cwd, '.sessions') })
     await ctx.plugin(SessionQuery, { path: ':memory:', openAt: 'never' })
     await ctx.plugin(AgentLoop, { agents: [] })

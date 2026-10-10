@@ -31,11 +31,11 @@ Cleanup accepts an ID created by this live Host round, never an arbitrary path. 
 
 Mutation runs through official `tools.execute → bash`, retaining policy, cancellation and final-result semantics. Removal uses `git worktree remove`, without force, recursive shell deletion or branch deletion. Ignored build/dependency artifacts follow Git's temporary-checkout removal semantics; they are not delivery archives.
 
-If evidence is missing, retain the checkout and report the reason to the Leader. Unknown, dirty or unintegrated work is never erased just because a task ended. Concurrent cleanup admits one successful operation. Existing user files, branches and other worktrees are outside this feature's cleanup scope.
+If evidence is missing, retain the checkout and report the reason to the Leader. Unknown, dirty or unintegrated work is never erased just because a task ended. Concurrent cleanup admits one successful operation. A synchronous pending-creation reservation and existing ownership leases prevent round replacement until creation/owned delivery is settled. Directory changes invalidate prior evidence and feedback even after restoration; in-flight guards reject operations spanning the change. Existing user files, branches and other worktrees are outside this feature's cleanup scope.
 
 ## Official capabilities and limits
 
-The inspected rc.2 `SpawnTeammateRequest` has no per-member cwd. Standard Team members inherit the root workspace. This flow explicitly passes tool paths: **it does not automatically change Session cwd or enforce file-access isolation**. If real models repeatedly omit the path, reassess composition through official Agent/provider APIs; do not mutate private headers.
+The alpha.2 official working-directory service can change effective cwd, but Devwork does not allocate or switch member directories. Its Leader integration root stays fixed to the original Session directory. Standard Team creation is not automatic task-worktree routing. This flow explicitly passes tool paths: **it does not automatically change Session cwd or enforce file-access isolation**. If real models repeatedly omit the path, reassess composition through official Agent/provider APIs; do not mutate private headers.
 
 The current proof uses Git ancestry and supports fast-forward/ordinary merge. Squash, cherry-pick and abandoning unintegrated results have no automatic cleanup path yet. A model's claim of integration cannot replace Git facts. The tools grant no new commit, merge or human-acceptance authority.
 

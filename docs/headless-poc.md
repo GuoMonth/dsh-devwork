@@ -2,7 +2,7 @@
 
 English | [中文](headless-poc.zh.md)
 
-Baseline: DSH 0.2.1-alpha.1 (`5badb15009ae1756c3afe0ae0cef1faafc290ccc`), Cordis 4.0.5-alpha.1, Node 24.x, strict TypeScript 7.0.2. Local validation: 2026-10-09.
+Baseline: DSH 0.2.1-alpha.2 (`d743267388641bc76f17c45ce8b4c231aed1d32c`), Cordis 4.0.5-alpha.1, Node 24.x, strict TypeScript 7.0.2. Alpha.2 compatibility probes: 2026-10-10; current regression commands are below.
 
 ## Assessment
 
@@ -27,22 +27,28 @@ Sources: [batch diff review](https://www.onorca.dev/docs/review/annotate-ai-diff
 ## Plugin and lifecycle
 
 - `dsh.bundle.patch` inserts this Host feature only; it does not silently enable Team.
-- `inject` waits for agents, agentTeams, tools, systemPrompt and workspaceChanges. Missing providers mean PENDING; npm installation does not activate services.
+- `inject` waits for agents, agentTeams, tools, systemPrompt, workspaceChanges and workingDirectory. Missing providers mean PENDING; npm installation does not activate services.
 - `ctx.plugin(Devwork)` provides `ctx.devwork`. Official registrations own tools and dynamic prompt sections. Guidance appears only for an open round.
 - A round stores official task IDs and its own acceptance/feedback data; task state is read from the official service. Only the exact live Leader can control it.
 - Idle Team members may release their live instance and return on the next message. Do not retain Worker objects.
 - A lifetime effect aborts and drains owned asynchronous operations on unload. Dependency loss unloads the feature; return creates a fresh service without old ephemeral rounds.
 - Client uses the public `conversation.input.left` slot, inputActions revision-protected insertion and locale/effects. Slot collapse and plugin unload remove it. No private UI imports, DOM manipulation or duplicate React.
 
-Official references: [effects](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/cordis-tutorial/02-lifecycle-and-effects.md), [injection](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/cordis-tutorial/03-services.md), [headless](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/bundle/headless/README.md).
+Official references: [effects](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/docs/cordis-tutorial/02-lifecycle-and-effects.md), [injection](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/docs/cordis-tutorial/03-services.md), [headless](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/packages/bundle/headless/README.md).
 
 The Host observes live `session/event` announcements and binds each official diff to a read-only fingerprint in `agent/turn-stopping`, after the official serial recorder listener. It does not use deprecated synchronous Session history APIs. Later verification cannot rebind an old diff to changed content. Missing/unbound snapshots, changed checkouts and truncated file lists block review. An unchanged later turn may reuse the bound snapshot. This prevents stale review; it cannot detect every omitted file within an otherwise nonempty official snapshot.
 
-Upgrade findings: [official alpha.1 assessment](upstream-alpha-assessment.md).
+Upgrade findings: [official alpha.2 assessment](upstream-alpha-assessment.md).
+
+## Fixed integration directory
+
+Every round captures `integrationRoot` from the Leader’s original `session.header.cwd`, requiring the official `workingDirectory.get(session)` to match. Briefs, review snapshots and feedback batches expose that root. Verification, review, feedback, worktree creation, handoff and cleanup refuse a mismatched directory; Devwork never changes it automatically. Official Bash calls explicitly use the integration root.
+
+A `working-directory/change` event clears acceptance evidence, the official diff binding, review and prepared feedback batches. Restoring the original directory does not restore them: obtain a fresh recorded diff and run verification again. A directory-version guard rejects asynchronous operations spanning a change, including switch-away-and-back. Review and feedback also check that the official summary’s `cwd` matches the fixed root. These guards prevent attribution across directories; they do not move running shells, allocate member worktrees or enforce isolation.
 
 ## Task delivery
 
-`devwork_worktree`, `devwork_handoff`, and `devwork_cleanup` form a small optional checkout lifecycle. Leader summaries and source identity are committed; temporary checkouts are removed after verified integration. `cleanupPending` keeps unfinished cleanup visible. Details and merge-mode boundaries: [task delivery](task-delivery.md).
+`devwork_worktree`, `devwork_handoff`, and `devwork_cleanup` form a small optional checkout lifecycle. Leader summaries and source identity are committed; temporary checkouts are removed after verified integration. `cleanupPending` keeps unfinished cleanup visible. A synchronous pending-creation reservation prevents replacing a round while a worktree is being created; owned leases also block replacement. Details and merge-mode boundaries: [task delivery](task-delivery.md).
 
 ## Interfaces
 
@@ -50,9 +56,9 @@ Model tools: `devwork_open` references existing tasks and declares checks; `devw
 
 Host API: `ctx.devwork.open/brief/review/prepareFeedback/sendFeedback`. Feedback is a trusted Host/UI action, not a model tool that can invent human comments. Sending queues one normal user follow-up to the same Leader and clears old evidence. Duplicate/concurrent sends accept one batch once.
 
-Checks run through **DSH tools.execute → official bash → shell/subprocess**, retaining policy and cancellation. Only settled foreground output with exit code 0, no timeout and no abort passes. Code changes across/after checks invalidate evidence. Passing selected checks is neither sufficient test coverage, human acceptance nor commit permission.
+Checks run through **DSH tools.execute → official bash → shell/subprocess**, retaining policy and cancellation. A temporary official `tools.guard`, scoped to the caller Agent and exact nested Bash call ID, rechecks the directory generation after asynchronous permission/pre-execute handling before allowing execution. This does not cancel or relocate an already-running shell. Only settled foreground output with exit code 0, no timeout and no abort passes. Code changes across/after checks invalidate evidence. Passing selected checks is neither sufficient test coverage, human acceptance nor commit permission.
 
-The read-only fingerprint covers tracked and non-ignored files in the Git root, including preexisting dirty content. It does not change index/refs/worktree. POC limits: 10,000 files, 8 MiB per file, 64 MiB total; no submodule directories. Large-repository cost needs assessment.
+The read-only fingerprint covers tracked and non-ignored files in the Git root, including preexisting dirty content. Review, feedback preparation and feedback sending reject official file paths that escape the root or are absent from that existing `git ls-files` fingerprint set, including ignored untracked captures. This is a membership check, not a broader scanner or proof that upstream recorded every change. Staged or committed deletions absent from the current `git ls-files` set also refuse review; unstaged tracked deletions remain listed, so this is not general deleted-file coverage. It does not change index/refs/worktree. POC limits: 10,000 files, 8 MiB per file, 64 MiB total; no submodule directories. Large-repository cost needs assessment.
 
 ## Reproduce and evidence boundary
 
@@ -63,7 +69,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-Nine `tests/headless.mts` behavior scenarios cover:
+`tests/headless.mts` behavior scenarios cover:
 
 1. Real AgentLoop, Team/tools, JSONL persistence, SessionQuery, Bash/subprocess and workspace-changes: writer edit, dependent read-only review, Leader acceptance, two comments in one batch, same-member revision and recheck. Root diff includes member changes and excludes an existing dirty README; stale feedback and concurrent duplicate delivery fail closed.
 2. Unload cancels/drains a running official check process.
@@ -76,11 +82,13 @@ Nine `tests/headless.mts` behavior scenarios cover:
 8. An external edit followed by a verification-only turn cannot reuse an old diff, despite passing checks; restored identical content can reuse it, and a recorded revision creates a new binding.
 9. An official one-file cap on a two-file result refuses a complete review.
 
-Two `tests/client.mts` browser-free checks load the actual closure factory with official SlotRegistry, exercise declaration/collapse/redeclaration/unload, and check explicit request insertion, insertion revision and no auto-submit. The model is our deterministic script and Client locale is a boundary fixture. Business services and SlotRegistry use published official packages. Real models, a complete CLI profile and macOS/Windows desktop have not been validated.
+Directory guards additionally cover a mismatched official working directory, change-event invalidation after restoration, in-flight changes and official summary-directory checks. These are local regression boundaries, not a claim of upstream runtime repair.
+
+`tests/client.mts` browser-free checks load the actual closure factory with official SlotRegistry, exercise declaration/collapse/redeclaration/unload, and check explicit request insertion, insertion revision and no auto-submit. The model is our deterministic script and Client locale is a boundary fixture. Business services and SlotRegistry use published official packages. Real models, a complete CLI profile and macOS/Windows desktop have not been validated.
 
 ## Blockers and limits
 
-**alpha.1 public declaration defect (retained from rc.2):** the projection wire-register overload lets `K` span Client keys while indexing Host state keys. Partial public-entry type programs expose keys such as `subagent` without their private Host declarations, causing strict library errors. This is declaration composition, not a requirement for plugin users to install TS7.
+**alpha.2 public declaration defect (retained from rc.2):** the projection wire-register overload lets `K` span Client keys while indexing Host state keys. Partial public-entry type programs expose keys such as `subagent` without their private Host declarations, causing strict library errors. This is declaration composition, not a requirement for plugin users to install TS7.
 
 `scripts/prepare-types.mts` narrows the development declaration to `keyof SessionProjectionMap & keyof SessionProjectionStateMap`. It validates exact version/signature, is idempotent and refuses unfamiliar input. No `any`, suppressions or `skipLibCheck`. It changes one development `.d.ts`, no runtime, no published artifact and no user-host installation. Reassess on upgrade; downstream strict TS consumers remain exposed to upstream declaration quality.
 
@@ -88,7 +96,7 @@ The type follow-up is tracked in [development issue #4](https://github.com/GuoMo
 
 Client declarations also require explicit transitive type dependencies and public generated remote types. These are development dependencies, not browser bundle inputs. Separate Host/Client programs and retained type references keep emitted declarations self-contained without private imports.
 
-**Same-second equal-size snapshot misses.** Local traces showed changed content/timestamps but identical official before/after trees. Copied-index timestamps affecting racy-Git checks are the current hypothesis; see [development issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7). Normal fixtures use an old baseline mtime to model an existing repository and avoid creation-time collisions. This bounds the tests, not a production fix. `DEVWORK_POC_FRESH_BASELINE=1` restores the fresh baseline for diagnosis. No official runtime or user index is modified, and failures are not suppressed with retries. Missing official snapshots still block review. The same implementation remains in alpha.1; the new binding guard also rejects an old snapshot after later checkout changes, but is not an upstream snapshot fix.
+**Same-second equal-size snapshot misses.** Local traces showed changed content/timestamps but identical official before/after trees. Copied-index timestamps affecting racy-Git checks are the current hypothesis; see [development issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7). Normal fixtures use an old baseline mtime to model an existing repository and avoid creation-time collisions. This bounds the tests, not a production fix. `DEVWORK_POC_FRESH_BASELINE=1` restores the fresh baseline for diagnosis. No official runtime or user index is modified, and failures are not suppressed with retries. Missing official snapshots still block review. Alpha.2 validation still reproduces the miss; the new binding guard also rejects an old snapshot after later checkout changes, but is not an upstream snapshot fix.
 
 Remaining first-phase boundaries:
 

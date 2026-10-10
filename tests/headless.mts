@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
@@ -8,6 +9,7 @@ import type { FiberState } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import * as WorkspaceChanges from '@deepseek-ai/dsh-workspace-changes'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import * as Plugin from '../lib/index.js'
 import { boot, CHECK, complete, FIXED, INITIAL, prompt, quote, REVISED, SIGNAL, task, teammate, text, tool, until, writeCommand } from './runtime.mts'
 import { parseJson, record, string } from '../scripts/data.mts'
@@ -279,7 +281,7 @@ test('real Team + AgentLoop + bash + diff: develop, review, batch feedback, revi
     assert.equal(r.ctx.agentTeams.listMembers(r.lead).length, 3, 'Reuse the same Leader, writer and reviewer')
     assert.equal(r.ctx.agentTeams.listTasks(r.lead).length, 2, 'No mirrored/new task board')
     assert.ok(r.model.requests.some(request => request.messages.some(message => message.role === 'system' && JSON.stringify(message).includes('Task completed or member inactive is not verification evidence'))))
-    assert.ok(r.lead.session.snapshotEvents().some(event => event.type === 'team/message/queued'))
+    assert.ok(r.lead.session.snapshotEvents().some(event => event.type === 'agent/inbox/spliced' && event.data.inserted.some(message => message.source?.kind === 'agent-message')))
   } finally { await r.close() }
 })
 
@@ -469,4 +471,261 @@ test('real Cordis lifecycle: pending dependencies, activation, cleanup and react
     const assembly = await r.ctx.systemPrompt.assemble({ agent: r.lead })
     assert.ok(!assembly.sections.some(section => section.name === 'devwork:development-round'))
   } finally { await r.close() }
+})
+
+
+// Directory changes are real alpha.2 Session transitions, not header mutations.
+const DIRECTORY_MISMATCH = /working directory|snapshot directory|integration root/i
+const DIRECTORY_COMMENT = [{ file: 'math.ts', startLine: 1, endLine: 1, text: 'Keep the public signature.' }]
+async function directoryInvoke(r: Awaited<ReturnType<typeof boot>>, name: string, args: object = {}) {
+  await r.lead.whenIdle()
+  r.model.script(r.lead, [tool(name, args), text('Directory guard fixture settled.')])
+  prompt(r.lead, 'Run the requested fixture operation.')
+  await r.lead.whenIdle()
+  const event = r.lead.session.snapshotEvents().filter(event => event.type === 'tool/result').at(-1)
+  assert.ok(event?.type === 'tool/result')
+  return event.data.message
+}
+async function directoryReady(r: Awaited<ReturnType<typeof boot>>) {
+  const writing = await task(r)
+  await complete(r, writing.id)
+  const roundId = r.ctx.devwork.open(r.lead, { goal: 'Bind acceptance to the original project', taskIds: [writing.id], checks: [CHECK] })
+  r.model.script(r.lead, [tool('bash', { command: writeCommand(FIXED), description: 'Produce the reviewed change' }), tool('devwork_verify', {}), text('Result ready.')])
+  prompt(r.lead, 'Implement and verify this fixture.')
+  await r.lead.whenIdle()
+  const snapshot = await r.ctx.devwork.review(r.lead, SIGNAL)
+  const batch = await r.ctx.devwork.prepareFeedback(r.lead, snapshot, DIRECTORY_COMMENT, SIGNAL)
+  return { writing, roundId, snapshot, batch }
+}
+
+test('directory guard: opening while switched refuses to adopt another integration root', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  const other = await mkdtemp(join(tmpdir(), 'devwork-other-'))
+  try {
+    const writing = await task(r)
+    await r.ctx.workingDirectory.set(r.lead, other, SIGNAL)
+    assert.equal(r.lead.session.header.cwd, r.cwd)
+    assert.throws(() => r.ctx.devwork.open(r.lead, { goal: 'Do not adopt a switched directory', taskIds: [writing.id], checks: [CHECK] }), DIRECTORY_MISMATCH)
+  } finally { await r.close(); await rm(other, { recursive: true, force: true }) }
+})
+
+test('directory guard: missing-directory recovery preserves root identity but cannot revive evidence or feedback', { timeout: 40_000 }, async () => {
+  const r = await boot()
+  const other = await mkdtemp(join(tmpdir(), 'devwork-disappearing-'))
+  try {
+    const { roundId, snapshot, batch } = await directoryReady(r)
+    await r.ctx.workingDirectory.set(r.lead, other, SIGNAL)
+    await rm(other, { recursive: true, force: true })
+    assert.equal(await r.ctx.workingDirectory.ensure(r.lead, SIGNAL), r.cwd)
+    assert.equal(r.ctx.workingDirectory.get(r.lead.session), r.cwd)
+    assert.equal(r.lead.session.header.cwd, r.cwd)
+    const brief = await r.ctx.devwork.brief(r.lead, SIGNAL)
+    assert.equal(brief.roundId, roundId, 'Recovery does not replace the original round')
+    assert.equal(brief.checks[0]?.status, 'not-run')
+    assert.notEqual(brief.stage, 'ready-for-review')
+    assert.ok('integrationRoot' in brief)
+    assert.equal(brief.integrationRoot, r.cwd)
+    assert.ok('integrationRoot' in snapshot)
+    assert.equal(snapshot.integrationRoot, r.cwd)
+    assert.ok('integrationRoot' in batch)
+    assert.equal(batch.integrationRoot, r.cwd)
+    await assert.rejects(async () => r.ctx.devwork.review(r.lead, SIGNAL), /snapshot/i)
+    await assert.rejects(async () => r.ctx.devwork.prepareFeedback(r.lead, snapshot, DIRECTORY_COMMENT, SIGNAL), /snapshot/i)
+    await assert.rejects(async () => r.ctx.devwork.sendFeedback(r.lead, batch.id, SIGNAL), /batch/i)
+    const verified = await directoryInvoke(r, 'devwork_verify')
+    assert.ok(!verified.isError, JSON.stringify(verified.content))
+    assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).stage, 'ready-for-review')
+    await assert.rejects(async () => r.ctx.devwork.review(r.lead, SIGNAL), /snapshot/i)
+    await assert.rejects(async () => r.ctx.devwork.sendFeedback(r.lead, batch.id, SIGNAL), /batch/i)
+  } finally { await r.close(); await rm(other, { recursive: true, force: true }) }
+})
+
+test('directory guard: switched operations refuse before bash and never redirect the round', { timeout: 40_000 }, async () => {
+  const r = await boot()
+  const other = await mkdtemp(join(tmpdir(), 'devwork-switched-'))
+  let checkout: string | undefined
+  try {
+    const { writing, snapshot, batch } = await directoryReady(r)
+    const created = await directoryInvoke(r, 'devwork_worktree', { taskId: writing.id })
+    assert.ok(!created.isError, JSON.stringify(created.content))
+    const block = created.content.find(content => content.type === 'text')
+    assert.ok(block?.type === 'text')
+    const lease = record(parseJson(block.text))
+    const worktreeId = string(lease.id)
+    checkout = string(lease.path)
+    await r.ctx.workingDirectory.set(r.lead, other, SIGNAL)
+    let bashCalls = 0
+    r.ctx.on('tools/pre-execute', async (exec, next) => {
+      if (exec.name === 'bash') bashCalls++
+      return next()
+    })
+    for (const [name, args] of [
+      ['devwork_verify', {}],
+      ['devwork_worktree', { taskId: writing.id }],
+      ['devwork_handoff', { worktreeId, summary: 'Never run against the switched root.' }],
+      ['devwork_cleanup', { worktreeId }],
+    ] as const) {
+      const result = await directoryInvoke(r, name, args)
+      assert.ok(result.isError, `${name} must refuse`)
+      assert.match(JSON.stringify(result.content), DIRECTORY_MISMATCH)
+    }
+    await assert.rejects(async () => r.ctx.devwork.review(r.lead, SIGNAL), DIRECTORY_MISMATCH)
+    await assert.rejects(async () => r.ctx.devwork.prepareFeedback(r.lead, snapshot, DIRECTORY_COMMENT, SIGNAL), DIRECTORY_MISMATCH)
+    await assert.rejects(async () => r.ctx.devwork.sendFeedback(r.lead, batch.id, SIGNAL), DIRECTORY_MISMATCH)
+    assert.equal(bashCalls, 0, 'No nested acceptance or worktree shell operation may run')
+    assert.equal(r.ctx.workingDirectory.get(r.lead.session), other, 'Devwork does not silently restore the directory')
+    assert.equal(await readFile(join(r.cwd, 'math.ts'), 'utf8'), FIXED)
+  } finally {
+    await r.close()
+    await rm(other, { recursive: true, force: true })
+    if (checkout !== undefined) await rm(checkout, { recursive: true, force: true })
+  }
+})
+
+test('directory guard: an away-and-back switch during verification invalidates in-flight evidence', { timeout: 40_000 }, async () => {
+  const r = await boot()
+  const other = await mkdtemp(join(tmpdir(), 'devwork-aba-'))
+  try {
+    await directoryReady(r)
+    let switched = false
+    let bashBodies = 0
+    r.ctx.on('tools/execute', async (exec, next) => {
+      if (exec.name === 'bash') bashBodies++
+      return next()
+    })
+    r.ctx.on('tools/pre-execute', async (exec, next) => {
+      if (exec.name === 'bash' && !switched) {
+        switched = true
+        await r.ctx.workingDirectory.set(r.lead, other, SIGNAL)
+        await r.ctx.workingDirectory.set(r.lead, r.cwd, SIGNAL)
+      }
+      return next()
+    })
+    const result = await directoryInvoke(r, 'devwork_verify')
+    assert.ok(switched, 'Exercise an actual mid-verification transition')
+    assert.equal(bashBodies, 0, 'Recheck after asynchronous permission policy, before dispatching Bash')
+    assert.equal(r.ctx.workingDirectory.get(r.lead.session), r.cwd)
+    assert.ok(result.isError, JSON.stringify(result.content))
+    assert.match(JSON.stringify(result.content), /working directory changed/i)
+    const brief = await r.ctx.devwork.brief(r.lead, SIGNAL)
+    assert.equal(brief.checks[0]?.status, 'not-run')
+    assert.notEqual(brief.stage, 'ready-for-review')
+    assert.ok(!(await directoryInvoke(r, 'devwork_verify')).isError)
+    assert.equal((await r.ctx.devwork.brief(r.lead, SIGNAL)).stage, 'ready-for-review')
+  } finally { await r.close(); await rm(other, { recursive: true, force: true }) }
+})
+
+test('directory guard: foreign or unfingerprinted summary paths refuse review and feedback', { timeout: 40_000 }, async t => {
+  const r = await boot()
+  try {
+    const { snapshot, batch } = await directoryReady(r)
+    const original = r.ctx.workspaceChanges.summary.bind(r.ctx.workspaceChanges)
+    let outsideFile: string | undefined
+    t.mock.method(r.ctx.workspaceChanges, 'summary', (...args: Parameters<typeof original>) => {
+      const summary = original(...args)
+      if (summary === undefined) return undefined
+      return outsideFile === undefined
+        ? { ...summary, cwd: join(r.cwd, 'foreign-root') }
+        : { ...summary, files: summary.files.map(file => ({ ...file, path: outsideFile ?? file.path })) }
+    })
+    await writeFile(join(r.cwd, '.sessions/ignored.txt'), 'Ignored files are outside verification coverage.\n')
+    for (const foreignPath of [undefined, join(tmpdir(), 'external.ts'), '../escape.ts', '.sessions/ignored.txt']) {
+      outsideFile = foreignPath
+      await assert.rejects(async () => r.ctx.devwork.review(r.lead, SIGNAL), DIRECTORY_MISMATCH)
+      await assert.rejects(async () => r.ctx.devwork.prepareFeedback(r.lead, snapshot, DIRECTORY_COMMENT, SIGNAL), DIRECTORY_MISMATCH)
+      await assert.rejects(async () => r.ctx.devwork.sendFeedback(r.lead, batch.id, SIGNAL), DIRECTORY_MISMATCH)
+    }
+  } finally { t.mock.restoreAll(); await r.close() }
+})
+
+test('directory guard: a switch after successful cleanup does not retain a phantom owned worktree', { timeout: 40_000 }, async t => {
+  const r = await boot()
+  const other = await mkdtemp(join(tmpdir(), 'devwork-cleanup-switch-'))
+  let checkout: string | undefined
+  try {
+    const writing = await task(r, 'No-op delivery with an auditable handoff')
+    await complete(r, writing.id)
+    r.ctx.devwork.open(r.lead, { goal: 'Keep cleanup bookkeeping consistent after directory changes', taskIds: [writing.id], checks: ['node -e "process.exit(0)"'] })
+    const created = await directoryInvoke(r, 'devwork_worktree', { taskId: writing.id })
+    assert.ok(!created.isError, JSON.stringify(created.content))
+    const block = created.content.find(content => content.type === 'text')
+    assert.ok(block?.type === 'text')
+    const lease = record(parseJson(block.text))
+    const worktreeId = string(lease.id)
+    checkout = string(lease.path)
+    const handoff = await r.ctx.devwork.prepareHandoff(r.lead, worktreeId, 'No implementation changes were needed; preserve the existing checkout.', SIGNAL)
+    const writeSummary = `node -e ${quote(`const fs = require('node:fs'); fs.mkdirSync('docs/devwork', { recursive: true }); fs.writeFileSync(${JSON.stringify(handoff.summaryPath)}, ${JSON.stringify(handoff.markdown)})`)}`
+    const commitSummary = `${writeSummary} && git add -- ${quote(handoff.summaryPath)} && git -c user.name='Devwork POC' -c user.email=poc@example.invalid -c commit.gpgsign=false commit -m ${quote(`docs: record no-op delivery\n\n${handoff.commitTrailers}`)}`
+    assert.ok(!(await directoryInvoke(r, 'bash', { command: commitSummary, description: 'Commit the fixture handoff summary' })).isError)
+    assert.ok(!(await directoryInvoke(r, 'devwork_verify')).isError)
+    const execute = r.ctx.tools.execute.bind(r.ctx.tools)
+    let switched = false
+    t.mock.method(r.ctx.tools, 'execute', async (...args: Parameters<typeof execute>) => {
+      const result = await execute(...args)
+      if (args[0].name === 'bash' && !result.isError) {
+        const command = record(args[0].arguments).command
+        if (typeof command === 'string' && command.includes('git worktree remove --')) {
+          switched = true
+          assert.ok(checkout !== undefined && !existsSync(checkout), 'Removal completed before the directory event')
+          await r.ctx.workingDirectory.set(r.lead, other, SIGNAL)
+          await r.ctx.workingDirectory.set(r.lead, r.cwd, SIGNAL)
+        }
+      }
+      return result
+    })
+    const result = await directoryInvoke(r, 'devwork_cleanup', { worktreeId })
+    assert.ok(switched)
+    assert.ok(result.isError, 'The caller must learn that the directory changed during the operation')
+    assert.match(JSON.stringify(result.content), /working directory changed/i)
+    assert.deepEqual((await r.ctx.devwork.brief(r.lead, SIGNAL)).cleanupPending, [], 'Successful removal retires ownership before rejecting the stale operation')
+    assert.ok(checkout !== undefined && !existsSync(checkout))
+    assert.doesNotThrow(() => r.ctx.devwork.open(r.lead, { goal: 'A new round after completed cleanup', taskIds: [writing.id], checks: [CHECK] }))
+  } finally {
+    t.mock.restoreAll()
+    await r.close()
+    await rm(other, { recursive: true, force: true })
+    if (checkout !== undefined) await rm(checkout, { recursive: true, force: true })
+  }
+})
+
+
+test('directory guard: worktree creation refuses a permission-time ABA switch before Bash mutation', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  const other = await mkdtemp(join(tmpdir(), 'devwork-create-aba-'))
+  try {
+    const writing = await task(r)
+    r.ctx.devwork.open(r.lead, { goal: 'Never create a worktree after directory authorization went stale', taskIds: [writing.id], checks: [CHECK] })
+    let switched = false
+    let bashBodies = 0
+    r.ctx.on('tools/execute', async (exec, next) => {
+      if (exec.name === 'bash') bashBodies++
+      return next()
+    })
+    r.ctx.on('tools/pre-execute', async (exec, next) => {
+      if (exec.name === 'bash' && !switched) {
+        switched = true
+        await r.ctx.workingDirectory.set(r.lead, other, SIGNAL)
+        await r.ctx.workingDirectory.set(r.lead, r.cwd, SIGNAL)
+      }
+      return next()
+    })
+    const result = await directoryInvoke(r, 'devwork_worktree', { taskId: writing.id })
+    assert.ok(switched)
+    assert.ok(result.isError, JSON.stringify(result.content))
+    assert.equal(bashBodies, 0, 'The official post-permission guard must deny before Bash dispatch')
+    assert.deepEqual((await r.ctx.devwork.brief(r.lead, SIGNAL)).cleanupPending, [])
+    const worktrees = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: r.cwd, encoding: 'utf8' })
+    assert.equal(worktrees.match(/^worktree /gm)?.length, 1, 'No unowned checkout was created')
+    const ordinary = await directoryInvoke(r, 'bash', { command: 'node -e "process.exit(0)"', description: 'An unrelated Bash call after the scoped guard is disposed' })
+    assert.ok(!ordinary.isError, JSON.stringify(ordinary.content))
+    assert.equal(bashBodies, 1, 'A denied Devwork call must not retain a global Bash denial')
+    assert.doesNotThrow(() => r.ctx.devwork.open(r.lead, { goal: 'Creation reservation was released', taskIds: [writing.id], checks: [CHECK] }))
+  } finally {
+    // Also remove a fixture checkout if the regression reintroduces the mutation.
+    const extra = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: r.cwd, encoding: 'utf8' })
+      .split('\n').filter(line => line.startsWith('worktree ')).map(line => line.slice('worktree '.length)).filter(path => path !== r.cwd)
+    await r.close()
+    await rm(other, { recursive: true, force: true })
+    for (const path of extra) await rm(path, { recursive: true, force: true })
+  }
 })

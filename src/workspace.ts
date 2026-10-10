@@ -11,7 +11,7 @@ const MAX_TOTAL_BYTES = 64 * 1024 * 1024
 const MAX_FILES = 10_000
 
 /** Read-only bounded fingerprint; never changes index, refs, or worktree. */
-export async function workspaceFingerprint(cwd: string, signal: AbortSignal): Promise<string> {
+export async function workspaceFingerprint(cwd: string, signal: AbortSignal, requiredPaths: readonly string[] = []): Promise<string> {
   signal.throwIfAborted()
   const options = { cwd, signal, env: scrubbedParentEnv(), maxBuffer: 4 * 1024 * 1024, timeout: 10_000 }
   const { stdout: rootOutput } = await run('git', ['rev-parse', '--show-toplevel'], options)
@@ -19,6 +19,8 @@ export async function workspaceFingerprint(cwd: string, signal: AbortSignal): Pr
   if (resolve(cwd) !== resolve(root)) throw new Error('The POC requires cwd to be the Git repository root')
   const { stdout } = await run('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], options)
   const paths = [...new Set(stdout.split('\0').filter(Boolean))].sort()
+  const covered = new Set(paths)
+  for (const path of requiredPaths) if (!covered.has(path)) throw new Error(`Official change snapshot file is not covered by the integration root fingerprint: ${path}`)
   if (paths.length > MAX_FILES) throw new Error('Workspace exceeds the POC file limit')
   const hash = createHash('sha256')
   let bytes = 0

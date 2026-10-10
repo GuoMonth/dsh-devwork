@@ -2,7 +2,7 @@
 
 [English](headless-poc.md) | 中文
 
-基线：DSH 0.2.1-alpha.1（`5badb15009ae1756c3afe0ae0cef1faafc290ccc`）、Cordis 4.0.5-alpha.1、Node 24.x、严格 TypeScript 7.0.2。2026-10-09 本地验证。
+基线：DSH 0.2.1-alpha.2（`d743267388641bc76f17c45ce8b4c231aed1d32c`）、Cordis 4.0.5-alpha.1、Node 24.x、严格 TypeScript 7.0.2。alpha.2 兼容性探针验证日期：2026-10-10；当前回归命令见下文。
 
 ## 评估结论
 
@@ -27,22 +27,28 @@
 ## 插件机制与生命周期
 
 - bundle 仍使用 `dsh.bundle.patch`，只插入本项目 Host 插件行，不悄悄开启 Team。
-- `inject` 等待官方 agents、agentTeams、tools、systemPrompt、workspaceChanges；缺依赖时是 PENDING。安装 npm 包不等于这些服务已经启用。
+- `inject` 等待官方 agents、agentTeams、tools、systemPrompt、workspaceChanges、workingDirectory；缺依赖时是 PENDING。安装 npm 包不等于这些服务已经启用。
 - `ctx.plugin(Devwork)` 提供 `ctx.devwork`；工具和动态提示词通过官方注册 API 归属插件。只在已经打开的开发回合输出 Devwork 指导，不改写其他会话的系统提示词。
 - 回合只保存官方任务 ID 和自己的验收/反馈数据，任务状态每次从官方服务读取。校验准确的 live Leader 权限对象，Worker 无权操作主控回合。
 - Team 成员空闲后可能释放内存实例；消息恢复后身份不变。本项目不长期持有 Worker 对象。
 - `ctx.effect` 在卸载时取消并等待自己的异步工作，然后释放回合。依赖消失会卸载；依赖回来会得到全新服务，不恢复旧的临时回合。
 - Client 注册使用公开 `conversation.input.left` slot、官方 inputActions 的插入版本保护、locale/effect；slot 声明消失或插件卸载都会移除入口。没有 DOM 操作、私有 UI 导入或第二份 React。
 
-官方依据：[生命周期与 effect](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/cordis-tutorial/02-lifecycle-and-effects.md)、[依赖注入](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/cordis-tutorial/03-services.md)、[Headless](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/bundle/headless/README.md)。
+官方依据：[生命周期与 effect](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/docs/cordis-tutorial/02-lifecycle-and-effects.md)、[依赖注入](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/docs/cordis-tutorial/03-services.md)、[Headless](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/packages/bundle/headless/README.md)。
 
 Host 观察 `session/event` 的实时变更公告，并在 `agent/turn-stopping` 中、官方 recorder 串行监听器之后，将 diff 绑定到只读工作区指纹；不再调用已弃用的同步 Session 历史接口。后续验收不能给旧 diff 换绑新代码。缺失或未绑定的快照、代码变化、文件列表被截断时均拒绝审查；后续未改变代码的轮次可复用原绑定。这防止旧 diff 误审，但不能证明非空官方快照内部没有漏掉某个文件。
 
-升级核查见[官方 alpha.1 评估](upstream-alpha-assessment.zh.md)。
+升级核查见[官方 alpha.2 评估](upstream-alpha-assessment.zh.md)。
+
+## 固定整合目录
+
+每个回合从 Leader 原始 `session.header.cwd` 固定 `integrationRoot`，并要求官方 `workingDirectory.get(session)` 与其一致。brief、审查快照和反馈批次都暴露该目录。验收、审查、反馈、worktree 创建、交接与清理会拒绝目录不匹配；Devwork 不自动切换目录。官方 Bash 调用显式使用整合根目录。
+
+`working-directory/change` 事件清空验收证据、官方 diff 绑定、审查和待发反馈；切回原目录不会恢复它们，必须取得新记录的 diff 并重新验收。目录版本守卫拒绝跨越目录变化的异步操作，包括切走又切回；审查与反馈还校验官方 summary 的 `cwd` 与固定目录一致。这些保护避免跨目录错误归属，不迁移运行中 shell，不自动分配成员 worktree，也不提供强制隔离。
 
 ## 任务交付
 
-`devwork_worktree`、`devwork_handoff`、`devwork_cleanup` 组成小型可选 checkout 生命周期。Leader 摘要与提交来源进入 Git，临时目录在整合验收后删除；`cleanupPending` 呈现尚未收尾的 checkout。详细流程和合并方式边界见[任务交付](task-delivery.zh.md)。
+`devwork_worktree`、`devwork_handoff`、`devwork_cleanup` 组成小型可选 checkout 生命周期。Leader 摘要与提交来源进入 Git，临时目录在整合验收后删除；`cleanupPending` 呈现尚未收尾的 checkout。同步登记的创建中预留阻止 worktree 创建期间替换回合；已有 ownership lease 也阻止替换。详细流程和合并方式边界见[任务交付](task-delivery.zh.md)。
 
 ## 已实现的接口
 
@@ -50,9 +56,9 @@ Host 观察 `session/event` 的实时变更公告，并在 `agent/turn-stopping`
 
 Host API：`ctx.devwork.open/brief/review/prepareFeedback/sendFeedback`。反馈 API 供可信 Host/UI 调用，未暴露为让模型伪造人类意见的工具。`sendFeedback` 投递一条普通用户后续消息到相同 Leader，清空旧证据；同一批重复或并发发送只接受一次。
 
-验收命令通过 **DSH tools.execute → 官方 bash → shell/subprocess** 运行，继承原有策略与取消信号。不绕过权限直接启动任意验收命令。只有最终 foreground 结果满足退出码 0、未超时、未中断才算通过；前后代码指纹不同则证据过期。通过所选命令不等于测试充分，也不等于人已接受或授权提交。
+验收命令通过 **DSH tools.execute → 官方 bash → shell/subprocess** 运行，继承原有策略与取消信号。不绕过权限直接启动任意验收命令。临时官方 `tools.guard` 仅限调用者 Agent 和准确的嵌套 Bash call ID，在异步权限/pre-execute 处理后重新检查目录版本，才允许执行；它不取消或迁移已经运行的 shell。只有最终 foreground 结果满足退出码 0、未超时、未中断才算通过；前后代码指纹不同则证据过期。通过所选命令不等于测试充分，也不等于人已接受或授权提交。
 
-指纹只读 Git 根目录中 tracked 和非 ignored 的文件，覆盖已有 dirty 内容；不修改 index、refs 或工作树。POC 上限为 10,000 文件、单文件 8 MiB、总计 64 MiB；不支持 submodule 目录。大仓库需要重新评估扫描成本。
+指纹只读 Git 根目录中 tracked 和非 ignored 的文件，覆盖已有 dirty 内容；审查、准备反馈和发送反馈时，若官方文件路径逃出根目录，或不在现有 `git ls-files` 指纹集合内（如被捕获的 ignored 未跟踪文件），均拒绝继续。这是集合归属检查，不扩大扫描范围，也不能证明上游记录了全部改动。已暂存或已提交删除若不在当前 `git ls-files` 集合中，也会拒绝审查；未暂存的 tracked 删除仍在列表中，因此不宣称普遍支持删除文件。不修改 index、refs 或工作树。POC 上限为 10,000 文件、单文件 8 MiB、总计 64 MiB；不支持 submodule 目录。大仓库需要重新评估扫描成本。
 
 ## 复现与验证边界
 
@@ -63,7 +69,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-`tests/headless.mts` 九项行为测试：
+`tests/headless.mts` 行为测试覆盖：
 
 1. 真实 AgentLoop、官方 Team/tools、JSONL persistence、SessionQuery、Bash/subprocess、workspace-changes：writer 修改 → 依赖 reviewer 审查 → Leader 验收 → 两条意见一批发送 → 原成员修订再验收。整体 diff 收入成员改动，排除之前的 dirty README；过期反馈和并发重复投递被拦截。
 2. 插件卸载取消正在运行的官方验收进程并等待收敛。
@@ -76,19 +82,21 @@ npm pack --dry-run
 8. 外部编辑后仅验收的轮次，即使通过检查，也不能复用旧 diff；恢复完全相同内容可复用，轮次内修改则产生新绑定。
 9. 两个成果文件被官方上限截为一个时，拒绝呈现完整审查。
 
-`tests/client.mts` 两项无浏览器检查：加载实际 closure-factory 与官方 SlotRegistry，验证晚声明/折叠/重声明/卸载；验证按钮插入显式请求、保持 insertion revision、不自动发送。模型是本项目确定性脚本，Client locale 是边界 fixture；官方业务服务与 SlotRegistry 使用发布包。没有执行真实模型、完整 DSH CLI profile 或 macOS/Windows 桌面验收。
+目录保护另覆盖官方工作目录不匹配、切回后仍失效、运行中目录变化和官方 summary 目录检查；这是本地回归边界，不代表修复了上游运行时。
+
+`tests/client.mts` 无浏览器检查：加载实际 closure-factory 与官方 SlotRegistry，验证晚声明/折叠/重声明/卸载；验证按钮插入显式请求、保持 insertion revision、不自动发送。模型是本项目确定性脚本，Client locale 是边界 fixture；官方业务服务与 SlotRegistry 使用发布包。没有执行真实模型、完整 DSH CLI profile 或 macOS/Windows 桌面验收。
 
 ## 发现的阻塞与限制
 
-**alpha.1 仍保留 rc.2 的公开声明缺陷。** `dsh-session-projection` 的 wire register 泛型允许 `K` 取 Client map 的任意键，却用它索引 Host state map。独立插件/测试类型程序只导入部分公开入口时，`subagent` 等键的私有 Host 声明未被带入，触发严格库检查错误。这是公开声明的组合问题，不能把它归因于用户安装 TS7。
+**alpha.2 仍保留 rc.2 的公开声明缺陷。** `dsh-session-projection` 的 wire register 泛型允许 `K` 取 Client map 的任意键，却用它索引 Host state map。独立插件/测试类型程序只导入部分公开入口时，`subagent` 等键的私有 Host 声明未被带入，触发严格库检查错误。这是公开声明的组合问题，不能把它归因于用户安装 TS7。
 
-`scripts/prepare-types.mts` 在开发依赖中将约束收紧为 `keyof SessionProjectionMap & keyof SessionProjectionStateMap`。它检查精确 alpha.1 版本与原始签名，幂等执行，拒绝不认识的声明；没有 `any`、类型压制或 `skipLibCheck`。只改开发目录中的一个 `.d.ts`，不改官方运行时代码，不打进 npm 产物，不在用户安装时修补宿主。升级官方版本需重新评估；下游严格 TS 消费仍受上游原始声明质量影响。
+`scripts/prepare-types.mts` 在开发依赖中将约束收紧为 `keyof SessionProjectionMap & keyof SessionProjectionStateMap`。它检查精确 alpha.2 版本与原始签名，幂等执行，拒绝不认识的声明；没有 `any`、类型压制或 `skipLibCheck`。只改开发目录中的一个 `.d.ts`，不改官方运行时代码，不打进 npm 产物，不在用户安装时修补宿主。升级官方版本需重新评估；下游严格 TS 消费仍受上游原始声明质量影响。
 
 类型后续在[开发 issue #4](https://github.com/GuoMonth/dsh-devwork/issues/4) 跟踪。`publint` 目前提示 ESM 包中的 Client closure-factory 看起来像 CJS。该入口是 DSH loader 脚本，不是独立 Node import；factory/SlotRegistry 测试覆盖它的实际加载约定，保留此工具警告。
 
 Client 公共声明还需要显式安装其传递类型依赖，以及导入公开生成的 remote 类型。这些在 devDependencies 中，不打入浏览器 bundle。Host 与 Client 分开编译，Client 声明保留必要的类型 reference；没有导入私有实现。
 
-**官方快照的同秒等长修改漏报。** 本地诊断观察到内容与文件时间戳已变，官方 before/after tree 却相同；当前推断与复制 index 后的时间戳/racy-Git 检查有关，详见[开发 issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7)。常规 fixture 给基线文件旧 mtime，模拟已有仓库，避免创建测试时的碰撞；这是测试边界，不是生产修复。`DEVWORK_POC_FRESH_BASELINE=1` 可恢复原始基线用于诊断。没有修改官方运行时或用户 index，也没有用自动重试压下失败；缺少官方快照时审查 API 仍拒绝操作。alpha.1 保留相同快照实现；新绑定保护也会拦截代码变化后的旧快照，但并非官方漏报修复。
+**官方快照的同秒等长修改漏报。** 本地诊断观察到内容与文件时间戳已变，官方 before/after tree 却相同；当前推断与复制 index 后的时间戳/racy-Git 检查有关，详见[开发 issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7)。常规 fixture 给基线文件旧 mtime，模拟已有仓库，避免创建测试时的碰撞；这是测试边界，不是生产修复。`DEVWORK_POC_FRESH_BASELINE=1` 可恢复原始基线用于诊断。没有修改官方运行时或用户 index，也没有用自动重试压下失败；缺少官方快照时审查 API 仍拒绝操作。alpha.2 验证仍复现漏报；新绑定保护也会拦截代码变化后的旧快照，但并非官方漏报修复。
 
 第一阶段其余边界：
 

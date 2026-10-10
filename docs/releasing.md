@@ -6,7 +6,7 @@ This is a third-party DSH bundle, not a profile or an official DSH distribution.
 
 ## Official requirements applied here
 
-The source baseline is DSH `0.2.1-alpha.1`, commit `5badb15009ae1756c3afe0ae0cef1faafc290ccc`.
+The source baseline is DSH `0.2.1-alpha.2`, commit `d743267388641bc76f17c45ce8b4c231aed1d32c`.
 
 | Contract | Project configuration |
 | --- | --- |
@@ -30,7 +30,7 @@ npm run pack:check
 npm pack --dry-run
 ```
 
-These validate strict Host/Client/script/test types, nine headless behavior scenarios, two Client boundary scenarios, exports, bundle metadata, and installing/importing the prebuilt tarball in an independent consumer. The Client uses the official closure-factory loader and public conversation slot. The exact alpha.1 declaration correction is development-only, excluded from the package; see the [POC assessment](headless-poc.md). They do not prove a desktop interaction or model task works. Before an actual release, install the tarball into the target DSH desktop, enable/disable the plugin, and verify every advertised capability. Recheck compatibility whenever the DSH baseline changes.
+These validate strict Host/Client/script/test types, headless behavior and Client boundary scenarios, exports, bundle metadata, and installing/importing the prebuilt tarball in an independent consumer. The Client uses the official closure-factory loader and public conversation slot. The exact alpha.2 declaration correction is development-only, excluded from the package; see the [POC assessment](headless-poc.md). They do not prove a desktop interaction or model task works. Before an actual release, install the tarball into the target DSH desktop, enable/disable the plugin, and verify every advertised capability. Recheck compatibility whenever the DSH baseline changes.
 
 ## GitHub alpha release
 
@@ -61,7 +61,7 @@ Before npm publication, install the prebuilt tarball or a local checkout. Git in
 
 ## Primary references
 
-- [Official packaging and installation tutorial](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/user/develop/basic/publish.md)
-- [Official plugin entry tutorial](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/docs/user/develop/basic/index.md)
-- [Official Agent Teams bundle metadata](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/experimental/agent-team-profile/package.json)
-- [Official plugin discovery guidance](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/README.md#community-and-support)
+- [Official packaging and installation tutorial](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/docs/user/develop/basic/publish.md)
+- [Official plugin entry tutorial](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/docs/user/develop/basic/index.md)
+- [Official Agent Teams bundle metadata](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/packages/experimental/agent-team-profile/package.json)
+- [Official plugin discovery guidance](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/README.md#community-and-support)
