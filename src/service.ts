@@ -23,6 +23,7 @@ interface Round {
   verifying: boolean
   change?: { seq: number; turn: number; settled: boolean; fingerprint?: string }
   worktrees: TaskWorktrees
+  pendingCreations: number
 }
 const BRIEF_SCHEMA = {
   type: 'object', additionalProperties: false, properties: {
@@ -160,14 +161,15 @@ export class Devwork extends Service {
   }
   open(agent: Agent, contract: DevelopmentContract): string {
     this.leader(agent)
-    if (this.rounds.get(agent)?.worktrees.list().length) throw new Error('Finish the owned worktree handoffs before replacing the round')
+    const current = this.rounds.get(agent)
+    if (current && (current.pendingCreations > 0 || current.worktrees.list().length)) throw new Error('Finish the owned worktree handoffs before replacing the round')
     this.cwd(agent)
     if (!contract.goal.trim() || contract.taskIds.length === 0 || contract.checks.length === 0) throw new Error('Goal, official tasks and acceptance commands are required')
     if (contract.taskIds.length > 16 || contract.checks.length > 8) throw new Error('The POC requires a small development round')
     if (new Set(contract.taskIds).size !== contract.taskIds.length || new Set(contract.checks).size !== contract.checks.length) throw new Error('Duplicate tasks or checks')
     for (const command of contract.checks) if (!command.trim() || command.length > 4096) throw new Error('Invalid acceptance command')
     for (const id of contract.taskIds) if (this.ctx.agentTeams.getTask(agent, id).status === 'deleted') throw new Error('Deleted task cannot enter a round')
-    const round: Round = { id: randomUUID(), contract: { goal: contract.goal, taskIds: [...contract.taskIds], checks: [...contract.checks] }, evidence: new Map(), batches: new Map(), verifying: false, worktrees: new TaskWorktrees() }
+    const round: Round = { id: randomUUID(), contract: { goal: contract.goal, taskIds: [...contract.taskIds], checks: [...contract.checks] }, evidence: new Map(), batches: new Map(), verifying: false, worktrees: new TaskWorktrees(), pendingCreations: 0 }
     this.rounds.set(agent, round)
     return round.id
   }
@@ -200,7 +202,13 @@ export class Devwork extends Service {
   createWorktree(agent: Agent, taskId: TeamTaskId, exec: ToolRunContext): Promise<TaskWorktree> {
     const round = this.round(agent)
     if (!round.contract.taskIds.includes(taskId) || this.ctx.agentTeams.getTask(agent, taskId).status === 'deleted') throw new Error('Worktree requires a current official round task')
-    return this.track(exec.signal, signal => round.worktrees.create(this.cwd(agent), round.id, taskId, signal, command => settledBash(this.ctx, agent, exec, command, this.cwd(agent), signal)))
+    return this.track(exec.signal, async signal => {
+      // Reserve synchronously: create yields on filesystem/Git reads before owning a lease.
+      round.pendingCreations++
+      try {
+        return await round.worktrees.create(this.cwd(agent), round.id, taskId, signal, command => settledBash(this.ctx, agent, exec, command, this.cwd(agent), signal))
+      } finally { round.pendingCreations-- }
+    })
   }
   prepareHandoff(agent: Agent, id: string, summary: string, signal: AbortSignal): Promise<TaskHandoff> {
     const round = this.round(agent)
