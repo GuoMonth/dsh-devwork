@@ -32,6 +32,8 @@ npm pack --dry-run
 
 这些检查覆盖严格 Host/Client/脚本/测试类型、headless 行为场景、Client 边界场景、入口、bundle 元数据，以及独立消费项目安装和导入预构建 tarball。Client 使用官方 closure-factory loader 和公开会话 slot。精确的 alpha.2 声明修正仅用于开发、不进入发布包，见 [POC 评估](headless-poc.zh.md)。这些检查不证明桌面交互或模型任务已可用。真正发布前，在目标 DSH 桌面端安装 tarball、启用/禁用插件，并验证所有对外宣称的功能。更换 DSH 基线后重新检查兼容性。
 
+累计审查 Host API 要求派发工作前等待 `open` 完成，并用返回的自有审查标识调用 `reviewDiff` 和反馈。发布验证需覆盖替换打开失败后恢复旧基线并清空证据、多 turn 起点到当前的改动、排除未变化的已有 dirty/未跟踪内容、已暂存/已提交删除、文本/文件反馈、代码过期与目录变化失效，以及原有权限/worktree 保护。用缺失、过期、漏报和截断的官方 summary 检查独立的覆盖文件列表；测试通过不代表上游快照 issue #7 已解决。保留 [POC 评估](headless-poc.zh.md#已实现的接口) 中的有界采集上限和不支持情形。不要把本次 Host 工作宣传成新的桌面审查 UI、真实模型验证或重启恢复；测试结果只能在发布候选版本实际执行命令后记录。
+
 ## GitHub alpha 发布
 
 1. 选择 `x.y.z-alpha.N` 版本，更新 `package.json` 和锁文件，在 `CHANGELOG.md` 记录实际变化。

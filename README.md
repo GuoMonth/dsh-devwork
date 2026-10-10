@@ -41,11 +41,11 @@ The output should include the Devwork bundle layer and the `guomonth-devwork` ro
 
 The test suite checks Host behavior and Client registration/insertion without a browser. The real-model and native desktop acceptance checks remain open. DSH alpha.2 retains a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
 
-Same-second equal-size official snapshot misses are tracked in [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7); the existing-repository test baseline is not a production fix.
+Host review captures its own bounded, actual-content baseline when the asynchronous `open` completes. Await it before dispatching coding work. Review compares that baseline with the current checkout across turns, including staged/committed changes and deletions while excluding unchanged preexisting dirty/untracked content. A lazy per-file `reviewDiff` exposes coarse text comparisons or file metadata; feedback supports current-side text lines and whole-file comments for deletions, binary files, executable-mode changes and symlinks.
 
-Each round keeps a fixed `integrationRoot` at the Leader’s original Session directory. The current official working directory must match it. Changing directories clears acceptance evidence, diff bindings and feedback, even after switching back; Devwork never switches the Leader automatically. Member tools must still receive explicit task-worktree paths.
+Each round keeps a fixed `integrationRoot` at the Leader’s original Session directory. The current official working directory must match it. Changing directories keeps the start baseline but clears acceptance evidence, current review and feedback, even after switching back; verify and capture a new review after restoration. Devwork never switches the Leader automatically. Member tools must still receive explicit task-worktree paths.
 
-Official alpha.2 upgrade findings: [assessment](docs/upstream-alpha-assessment.md). Diff bindings reject changed checkouts and truncated official file lists; they do not fix upstream snapshot omissions.
+Official alpha.2 upgrade findings: [assessment](docs/upstream-alpha-assessment.md). Same-second equal-size official snapshot misses remain unresolved in [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7). Official summaries are supplemental, never proof of coverage; their omissions or truncation cannot hide changes in Devwork’s own covered content. This is independent Host review, not an upstream repair. Capture uses two matching reads without retries or an external-writer lock, with limits of 10,000 paths, 8 MiB per file and 64 MiB total. Newly ignored-only paths are excluded; submodule directories refuse capture rather than being silently skipped. Baseline paths remain covered. See the [POC boundaries](docs/headless-poc.md#interfaces).
 
 ## Package and release
 
