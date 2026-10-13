@@ -9,8 +9,8 @@
 - Add temporary detached task worktrees, committed Leader handoffs/provenance and non-forced cleanup after verified integration; no long-lived task branches or checkout archives.
 - Align all DSH peers with official 0.2.1-alpha.2 and Cordis 4.0.5-alpha.1; use live official change events instead of synchronous history reads from the Host.
 - Require official working-directory support and a fixed per-round integration root; invalidate evidence/diff/feedback on directory changes, guard in-flight operations, validate summary directories, and explicitly route official Bash to that root. Preserve detached task delivery and pending-creation reservations; no automatic Leader switch or member isolation.
-- Add an awaited actual-content start baseline and independent bounded cumulative Host review across turns, with lazy coarse file comparisons, new-side text comments and file-level deletion/binary/mode/symlink feedback. Keep baseline paths after staged/committed deletion and retain the baseline across directory changes while invalidating current evidence/review/batches. Official summaries are supplemental; upstream snapshot issue #7 remains unresolved. No new UI, model, orchestration or recovery layer.
-- Add a thin public-slot Client entry that inserts an editable explicit Team request; no automatic submission.
+- Add an awaited actual-content start baseline and independent bounded cumulative Host review across turns, with lazy coarse file comparisons, new-side text comments and file-level deletion/binary/mode/symlink feedback. Keep baseline paths after staged/committed deletion and retain the baseline across directory changes while invalidating current evidence/review/batches. Official summaries are supplemental; upstream snapshot issue #7 remains unresolved.
+- Add a thin public-slot Client entry that inserts an editable explicit Team request and a public-Remote result/feedback draft panel; no automatic submission or full diff editor.
 - Exercise real official services with a deterministic model in local headless tests, including dependency loss and in-flight unload.
 - Keep strict library checks with a development-only correction to the projection declaration defect retained from rc.2 in alpha.2. Real-model/desktop acceptance and npm publication remain pending.
 
@@ -21,7 +21,7 @@
 - 增加临时 detached 任务 worktree、已提交的 Leader 摘要/提交来源与整合验收后的无强制清理；不保留长期任务分支或 checkout 副本。
 - 对齐官方 DSH 0.2.1-alpha.2 与 Cordis 4.0.5-alpha.1；使用官方实时变更事件，移除 Host 同步历史读取。
 - 依赖官方 working-directory 并固定每回合整合根目录；目录变化使证据/diff/反馈失效，保护运行中操作、校验 summary 目录，官方 Bash 显式使用该根目录。保留 detached 任务交付与创建中预留；不自动切换 Leader 或隔离成员。
-- 增加需等待完成的实际内容起点基线及独立、有界、跨 turn 的累计 Host 审查，按需延迟提供粗粒度文件比较、新侧文本行评论及删除/二进制/mode/符号链接的文件级反馈。已暂存/已提交删除后保留基线路径；目录变化保留基线并使当前证据/审查/批次失效。官方 summary 仅作补充，上游快照 issue #7 仍未解决。不新增 UI、模型、编排或恢复层。
-- 增加官方公开 slot 的轻量 Client 入口，插入可编辑的显式团队请求，不自动发送。
+- 增加需等待完成的实际内容起点基线及独立、有界、跨 turn 的累计 Host 审查，按需延迟提供粗粒度文件比较、新侧文本行评论及删除/二进制/mode/符号链接的文件级反馈。已暂存/已提交删除后保留基线路径；目录变化保留基线并使当前证据/审查/批次失效。官方 summary 仅作补充，上游快照 issue #7 仍未解决。
+- 增加官方公开 slot 的轻量 Client 入口，插入可编辑的显式团队请求，并通过公开 Remote 提供成果/反馈草稿面板；不自动发送，也不提供完整 diff 编辑器。
 - 用确定性模型驱动官方真实服务开展本地 headless 验证，覆盖依赖消失与运行中卸载。
 - 用仅限开发期的 alpha.2 仍存在的投影声明修正保留严格库检查。真实模型、桌面验收和 npm 发布仍待完成。

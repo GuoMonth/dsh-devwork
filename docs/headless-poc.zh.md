@@ -54,7 +54,7 @@ Host 观察 `session/event` 的实时公告，不使用已弃用的同步 Sessio
 
 模型工具：`devwork_open` 引用现有任务并声明验收命令，`devwork_verify` 执行验收，`devwork_brief` 读取紧凑摘要。创建/分配/恢复成员仍使用官方 Team 工具。`open` 为异步操作：派发开发工作前先打开回合，并等待实际内容基线采集完成。打开中的回合同步预留，采集未完成时不能被替换，后续 Leader/Team 工具在官方 pre-execute 边界等待。若替换回合的打开操作失败，且 Host 和 Leader 仍存活，会恢复之前成功回合及其基线，但清空其验收证据、当前审查、补充变更引用和待发批次；继续前需重新验收并刷新审查。首次打开失败则不保留回合。
 
-Host API：`ctx.devwork.open/brief/review/reviewDiff/prepareFeedback/sendFeedback`。`review` 要求 Leader 已停止运行，且当前验收证据通过。其自有 `id`、起点/当前指纹、`scope: 'round-start-to-current'` 和 `coverage: 'tracked-and-unignored-content'` 绑定累计变化文件列表；`seq` 只是补充的官方事件引用，没有时为零。新审查替代旧审查及其批次。反馈 API 供可信 Host/UI 调用，未暴露为让模型伪造人类意见的工具。`sendFeedback` 投递一条普通用户后续消息到相同 Leader，清空旧证据和审查；同一批重复或并发发送只接受一次。
+Host API：`ctx.devwork.open/brief/review/reviewDiff/prepareFeedback/sendFeedback`。公开 Client Remote endpoint `devwork/snapshot` 为成果面板投影当前 session 的紧凑 brief；没有可显示回合时返回明确的 unavailable/error 状态。`review` 要求 Leader 已停止运行，且当前验收证据通过。其自有 `id`、起点/当前指纹、`scope: 'round-start-to-current'` 和 `coverage: 'tracked-and-unignored-content'` 绑定累计变化文件列表；`seq` 只是补充的官方事件引用，没有时为零。新审查替代旧审查及其批次。反馈 API 供可信 Host/UI 调用，未暴露为让模型伪造人类意见的工具。`sendFeedback` 投递一条普通用户后续消息到相同 Leader，清空旧证据和审查；同一批重复或并发发送只接受一次。
 
 `reviewDiff` 按需延迟计算单个文件比较。文本返回粗粒度整文件 `oldText`/`newText`，保留末尾换行状态，不是最小 hunk diff。二进制/非 UTF-8 内容和符号链接目标使用元数据。文件两侧呈现不存在、普通文件字节数/可执行位或符号链接目标。整文件评论覆盖任意变化文件，包括删除、二进制、仅 mode 变化和符号链接。行评论使用已变化当前侧文本的 1-based 范围，不支持旧侧/已删除行，也不要求范围对应最小变化 hunk。每批允许 1–32 条评论，每条最多 4,000 字符，行片段总计最多 64 KiB。内容过期、审查标识被替代或目录变化后，拒绝复用 diff/反馈。
 
@@ -110,6 +110,6 @@ Client 公共声明还需要显式安装其传递类型依赖，以及导入公�
 - 官方快照仍按 turn 记录；Host API 在有界范围内独立审查从等待完成的回合起点开始、跨 turn 的净变化，不提供变更历史、参与者归属或范围外覆盖。
 - 当前回合、验收证据和反馈批次只活在本 Host/Leader 生命周期；进程重启不恢复。一次性 headless CLI 退出后不能继续该临时回合。
 - 文本比较为粗粒度整文件，支持当前侧行反馈及删除/二进制/mode/符号链接变化的文件级反馈；超限采集、旧侧/删除行定位、自动重定位和 unresolved 线程仍不支持。
-- UI 已有发起入口，完整反馈编辑与 Host/Client 传输未接入。真实模型的拆解、任务契约、判断和摘要仍待验证。
+- UI 已有发起入口和通过公开 Remote 的紧凑成果/反馈草稿面板；完整 diff 编辑器与反馈线程生命周期仍待实现。真实模型的拆解、任务契约、判断和摘要仍待验证。
 
-下一步优先：真实模型验收同一闭环 → 在公开能力允许的范围内接入小型成果/反馈面板 → 再决定细粒度 diff、意见保留、第二名 writer 或 worktree 自动路由的必要性。本次 Host 可靠性工作不新增 UI、模型或编排层。邮件、远程与恢复继续不进入第一阶段。
+下一步优先：在原生桌面与真实模型中验收紧凑成果/反馈面板 → 再决定细粒度 diff、意见保留、第二名 writer 或 worktree 自动路由的必要性。邮件、远程与恢复继续不进入第一阶段。

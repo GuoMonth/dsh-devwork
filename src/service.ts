@@ -1,20 +1,22 @@
 import { randomUUID } from 'node:crypto'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { TeamTaskId } from '@deepseek-ai/dsh-experimental-agent-team'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-workspace-changes'
 import type {} from '@deepseek-ai/dsh-working-directory'
+import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { changedPaths, workspaceFingerprint, workspaceManifest } from './workspace.js'
 import type { WorkspaceManifest } from './workspace.js'
 import { contentLines, fileDiff } from './review.js'
 import { guardedBash, settledBash } from './bash.js'
 import { TaskWorktrees } from './worktrees.js'
-import type { DevelopmentContract, DevelopmentBrief, FeedbackBatch, ReviewComment, ReviewSnapshot, ReviewFileDiff, TaskWorktree, TaskHandoff, WorktreeReceipt } from './types.js'
+import type { DevelopmentContract, DevelopmentBrief, DevworkRemoteRequest, DevworkRemoteSnapshot, FeedbackBatch, ReviewComment, ReviewSnapshot, ReviewFileDiff, TaskWorktree, TaskHandoff, WorktreeReceipt } from './types.js'
 
 declare module '@deepseek-ai/cordis' { interface Context { devwork: Devwork } }
 
@@ -46,6 +48,9 @@ const BRIEF_SCHEMA = {
     cleanupPending: { type: 'array', required: true, items: { type: 'string' } },
   },
 } as const
+function remoteRequest(value: unknown): value is DevworkRemoteRequest {
+  return typeof value === 'object' && value !== null && 'sessionId' in value && typeof value.sessionId === 'string' && value.sessionId.length > 0
+}
 const POLICY = `Devwork is an explicitly requested local development round. Keep one Leader conversation.
 Use official Team tasks and messages. Assign small contracts with goal, paths and acceptance criteria; reuse teammates. Only create teammates when the user explicitly requests Team development.
 The round integration root is fixed to the Leader's original Session directory. Keep the Leader there for verification, review, feedback and worktree delivery. A working-directory change invalidates prior evidence and feedback, even after restoration; verify again. Devwork does not switch directories or move running shells.
@@ -57,7 +62,7 @@ When the user requests an isolated task checkout, devwork_worktree creates a tem
 After the task commits its result, call devwork_handoff for a concise Leader document and provenance trailers. Use the user's authorized commit/merge workflow to integrate the source commit and commit that exact summary. Rerun declared acceptance checks in the Leader checkout. Then devwork_cleanup removes the temporary checkout. cleanupPending must be empty before declaring delivery finished. Never force-remove worktrees or equate task complete with integration. These tools grant no commit/merge authority. A squash/cherry-pick does not preserve ancestry and cannot use this POC cleanup path.`
 
 /** Acceptance/review layer over official Team, tools and change services. */
-export class Devwork extends Service {
+export class Devwork extends TypertRemoteService {
   static inject = ['agents', 'agentTeams', 'tools', 'systemPrompt', 'workspaceChanges', 'workingDirectory']
   private readonly rounds = new Map<Agent, Round>()
   private readonly lifetime = new AbortController()
@@ -249,6 +254,17 @@ export class Devwork extends Service {
   brief(agent: Agent, signal: AbortSignal): Promise<DevelopmentBrief> {
     const round = this.round(agent)
     return this.trackRound(agent, round, signal, async (fused, guard) => this.buildBrief(agent, round, await this.fingerprint(agent, round, fused, guard)))
+  }
+  @Remote
+  async snapshot(request: unknown, signal: AbortSignal): Promise<DevworkRemoteSnapshot> {
+    if (!remoteRequest(request)) return { status: 'error', error: 'Invalid Devwork snapshot request' }
+    const agent = this.ctx.agents.get(SessionId(request.sessionId))
+    if (agent === undefined || !this.rounds.has(agent)) return { status: 'unavailable' }
+    try {
+      return { status: 'available', brief: await this.brief(agent, signal) }
+    } catch (error) {
+      return { status: 'error', error: error instanceof Error ? error.message : String(error) }
+    }
   }
   private buildBrief(agent: Agent, round: Round, fingerprint: string): DevelopmentBrief {
     const tasks = this.tasks(agent, round)

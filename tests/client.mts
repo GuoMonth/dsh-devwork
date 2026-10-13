@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { test } from 'node:test'
 import { Context, Service } from '@deepseek-ai/cordis'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
-import { apply, inject, StartAction } from '../lib/client/index.js'
-import type { StartProps } from '../lib/client/index.js'
+import { apply, DevworkPanel, inject, StartAction } from '../lib/client/index.js'
+import type { PanelProps, StartProps } from '../lib/client/index.js'
 import { record } from '../scripts/data.mts'
 
 const require = createRequire(import.meta.url)
@@ -48,6 +49,15 @@ class LocaleFixture extends Service {
   }
 }
 
+/** Minimal Gateway-facing Remote service; the real Gateway supplies the same public face. */
+class RemoteFixture extends Service {
+  readonly devwork = {
+    snapshot: async () => ({ ok: true as const, value: { status: 'unavailable' as const } }),
+  }
+  $mount() { return Promise.resolve(async () => {}) }
+  constructor(ctx: Context) { super(ctx, 'remote') }
+}
+
 test('Client factory: official slot registers lazily and disposes with its declaration and plugin', async () => {
   const ctx = new Context()
   try {
@@ -55,6 +65,7 @@ test('Client factory: official slot registers lazily and disposes with its decla
     assert.ok(renderer(module))
     await ctx.plugin(module.SlotRegistry)
     await ctx.plugin(LocaleFixture)
+    await ctx.plugin(RemoteFixture)
     const loaded = factory(fileURLToPath(new URL('../lib/client.js', import.meta.url)))
     assert.ok(client(loaded))
     assert.deepEqual([...loaded.inject], [...inject])
@@ -63,11 +74,11 @@ test('Client factory: official slot registers lazily and disposes with its decla
     const declarationFixture = (props: PropsRenderSlots<'conversation.input.left'>) => { void props.renderSlot; return null }
     const declare = () => ctx.slots.register({ name: 'root', inject: () => ({}), children: { 'conversation.input.left': { kind: 'list', scope: 'session' } } }, declarationFixture)
     const collapse = declare()
-    assert.equal(ctx.slots.entries('conversation.input.left').length, 1)
+    assert.equal(ctx.slots.entries('conversation.input.left').length, 2)
     collapse()
     assert.equal(ctx.slots.entries('conversation.input.left').length, 0)
     const redeclare = declare()
-    assert.equal(ctx.slots.entries('conversation.input.left').length, 1)
+    assert.equal(ctx.slots.entries('conversation.input.left').length, 2)
     await feature.dispose()
     assert.equal(ctx.slots.entries('conversation.input.left').length, 0)
     redeclare()
@@ -81,6 +92,7 @@ test('UI is an editable explicit request, preserves insertion revision and never
     assert.ok(renderer(module))
     await ctx.plugin(module.SlotRegistry)
     const locale = await ctx.plugin(LocaleFixture)
+    await ctx.plugin(RemoteFixture)
     const feature = await ctx.plugin({ inject, apply })
     const instance = locale.ctx.get('locale')
     // Use this fixture's concrete provider only to inspect its owned dictionaries.
@@ -108,6 +120,10 @@ test('UI is an editable explicit request, preserves insertion revision and never
     assert.match(insertions[0] ?? '', /请使用 Agent Teams/)
     assert.equal(submissions, 0)
     assert.match(renderToStaticMarkup(createElement(StartAction, props)), /Devwork/)
+    const panelProps: PanelProps = { context: ctx, inputActions: actions, sessionId: SessionId('client-test'), t: key => dictionary[key] ?? key }
+    const panelMarkup = renderToStaticMarkup(createElement(DevworkPanel, panelProps))
+    assert.match(panelMarkup, /Devwork 结果/)
+    assert.match(panelMarkup, /为当前结果填写反馈/)
     await feature.dispose()
     assert.equal(instance.dictionaries.has('dsh-devwork'), false)
   } finally { await ctx.fiber.dispose() }

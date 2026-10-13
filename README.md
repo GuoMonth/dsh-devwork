@@ -15,7 +15,7 @@ A desktop development workspace built on [DeepSeek Harness](https://github.com/d
 
 The first phase focuses on local desktop development. Remote execution, mobile clients, email, and automatic crash recovery are deferred.
 
-The [headless POC assessment](docs/headless-poc.md) records the implementation, lifecycle findings, results and blockers. We reuse official tasks and members, gate delivery on current acceptance evidence, and send several diff comments as one follow-up to the same Leader. Temporary task worktrees now support a [committed Leader handoff and cleanup](docs/task-delivery.md). The UI currently provides an editable start request; a result/feedback surface remains to be built. See also the earlier [phase-one assessment](docs/phase-one.md).
+The [headless POC assessment](docs/headless-poc.md) records the implementation, lifecycle findings, results and blockers. We reuse official tasks and members, gate delivery on current acceptance evidence, and send several diff comments as one follow-up to the same Leader. Temporary task worktrees now support a [committed Leader handoff and cleanup](docs/task-delivery.md). The Client provides an editable start request and a compact result/feedback draft panel; a full diff editor and desktop acceptance remain open. See also the earlier [phase-one assessment](docs/phase-one.md).
 
 ## Develop and try the bundle
 
@@ -30,7 +30,7 @@ npm run pack:check
 npm pack
 ```
 
-In the DSH desktop Plugins page, use the local package directory as an installation source. Enable Devwork and the official opt-in Agent Teams bundle. The Host also needs official tools, a Bash provider, system prompt, workspace-changes, and working-directory. Missing services leave Devwork pending. The input action inserts an editable request and never submits it automatically. For CLI validation with an installed DSH CLI, from the directory above the checkout:
+In the DSH desktop Plugins page, use the local package directory as an installation source. Enable Devwork and the official opt-in Agent Teams bundle. The Host also needs official tools, a Bash provider, system prompt, workspace-changes, working-directory, and the public Remote gateway. Missing services leave Devwork pending. The input action inserts an editable request and never submits it automatically. The result panel reads the current round through the public Remote API and inserts feedback as an editable draft; it does not submit on the user's behalf. For CLI validation with an installed DSH CLI, from the directory above the checkout:
 
 ```sh
 dsh plugin --profile devwork-demo add ./dsh-devwork

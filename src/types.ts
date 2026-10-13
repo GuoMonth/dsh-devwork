@@ -25,6 +25,13 @@ export interface DevelopmentBrief {
   /** Temporary task checkouts still awaiting a committed handoff/cleanup. */
   cleanupPending: string[]
 }
+export interface DevworkRemoteRequest {
+  readonly sessionId: string
+}
+export type DevworkRemoteSnapshot =
+  | { readonly status: 'unavailable' }
+  | { readonly status: 'available'; readonly brief: DevelopmentBrief }
+  | { readonly status: 'error'; readonly error: string }
 export interface ReviewSnapshot {
   roundId: string
   /** Fixed Leader integration directory for this round. */

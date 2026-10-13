@@ -15,7 +15,7 @@
 
 第一阶段聚焦本地桌面开发。远程执行、手机客户端、邮件和崩溃自动恢复暂缓。
 
-参见[headless POC 评估](docs/headless-poc.zh.md)，包含实现、生命周期发现、验证结果与阻塞点。复用官方任务和成员，以当前代码的验收证据约束交付，把多个 diff 评论作为一条消息交回同一个 Leader。临时任务 worktree 已支持[提交 Leader 摘要后的交付清理](docs/task-delivery.zh.md)。UI 目前提供可编辑的启动请求，成果和反馈界面仍待实现。另见早期的[第一阶段评估](docs/phase-one.zh.md)。
+参见[headless POC 评估](docs/headless-poc.zh.md)，包含实现、生命周期发现、验证结果与阻塞点。复用官方任务和成员，以当前代码的验收证据约束交付，把多个 diff 评论作为一条消息交回同一个 Leader。临时任务 worktree 已支持[提交 Leader 摘要后的交付清理](docs/task-delivery.zh.md)。Client 现在提供可编辑的启动请求和紧凑的成果/反馈草稿面板；完整 diff 编辑器与桌面验收仍待完成。另见早期的[第一阶段评估](docs/phase-one.zh.md)。
 
 ## 开发与试装
 
@@ -30,7 +30,7 @@ npm run pack:check
 npm pack
 ```
 
-在 DSH 桌面端「插件」页面，以本地包目录试装，开启 Devwork 和官方显式启用的 Agent Teams bundle。Host 还需要官方 tools、Bash provider、system prompt、workspace-changes 和 working-directory；依赖缺失时 Devwork 保持 pending。输入区入口只插入可编辑请求，不自动发送。也可以在已安装 DSH CLI 的环境里，从仓库的上级目录验证安装：
+在 DSH 桌面端「插件」页面，以本地包目录试装，开启 Devwork 和官方显式启用的 Agent Teams bundle。Host 还需要官方 tools、Bash provider、system prompt、workspace-changes、working-directory 和公开 Remote gateway；依赖缺失时 Devwork 保持 pending。输入区入口只插入可编辑请求，不自动发送。成果面板通过公开 Remote API 读取当前回合，并把反馈插入为可编辑草稿，不代替用户发送。也可以在已安装 DSH CLI 的环境里，从仓库的上级目录验证安装：
 
 ```sh
 dsh plugin --profile devwork-demo add ./dsh-devwork
