@@ -23,6 +23,20 @@ import { parseJson, record, string } from '../scripts/data.mts'
 const PENDING: FiberState = 0
 const ACTIVE: FiberState = 2
 
+test('public Remote snapshot reports unavailable, active and invalid request states', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  try {
+    assert.deepEqual(await r.ctx.devwork.snapshot({ sessionId: r.lead.id }, SIGNAL), { status: 'unavailable' })
+    const writing = await task(r)
+    await complete(r, writing.id)
+    await r.ctx.devwork.open(r.lead, { goal: 'Expose the current round to the Client', taskIds: [writing.id], checks: ['node -e "process.exit(0)"'] })
+    const active = await r.ctx.devwork.snapshot({ sessionId: r.lead.id }, SIGNAL)
+    assert.equal(active.status, 'available')
+    if (active.status === 'available') assert.equal(active.brief.goal, 'Expose the current round to the Client')
+    assert.deepEqual(await r.ctx.devwork.snapshot({ sessionId: '' }, SIGNAL), { status: 'error', error: 'Invalid Devwork snapshot request' })
+  } finally { await r.close() }
+})
+
 test('owned worktree: real Team edits, committed Leader handoff, verified integration and non-forced cleanup', { timeout: 60_000 }, async () => {
   const r = await boot()
   let checkout: string | undefined
