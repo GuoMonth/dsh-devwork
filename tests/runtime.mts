@@ -25,6 +25,10 @@ import * as BashTool from '@deepseek-ai/dsh-tool-bash'
 import * as WorkspaceChanges from '@deepseek-ai/dsh-workspace-changes'
 import * as Plugin from '../lib/index.js'
 
+// The local agent runner may inject a partial Git command-line configuration.
+// Keep fixture Bash commands neutral; the dedicated scrubbing test sets and restores its own value.
+process.env.GIT_CONFIG_COUNT = '0'
+
 export const SIGNAL = new AbortController().signal
 export const CHECK = 'node check.ts'
 export const INITIAL = 'export function add(a: number, b: number): number { return a - b }\n'

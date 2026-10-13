@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
 import { apply, DevworkPanel, inject, StartAction } from '../lib/client/index.js'
 import type { PanelProps, StartProps } from '../lib/client/index.js'
+import { TYPERT_REMOTE } from '../lib/client/remote.js'
 import { record } from '../scripts/data.mts'
 
 const require = createRequire(import.meta.url)
@@ -57,6 +58,16 @@ class RemoteFixture extends Service {
   $mount() { return Promise.resolve(async () => {}) }
   constructor(ctx: Context) { super(ctx, 'remote') }
 }
+
+test('Remote contribution carries strict boundary codecs for the Gateway Client', () => {
+  const descriptor = TYPERT_REMOTE.descriptors[0]
+  assert.ok(descriptor)
+  const requestCodec = descriptor.parameters[0]?.codec
+  assert.ok(requestCodec)
+  assert.equal(requestCodec.mode, 'strict')
+  if (requestCodec.mode === 'strict') assert.deepEqual(requestCodec.create().parse({ sessionId: 'client-test' }), { sessionId: 'client-test' })
+  assert.equal(descriptor.result.mode, 'strict')
+})
 
 test('Client factory: official slot registers lazily and disposes with its declaration and plugin', async () => {
   const ctx = new Context()
