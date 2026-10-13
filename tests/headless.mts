@@ -967,6 +967,32 @@ test('capture refuses oversized files, unsafe ancestors and non-UTF8 filenames; 
   } finally { await r.close(); await rm(outside, { recursive: true, force: true }) }
 })
 
+test('workspace capture ignores inherited Git config counts after environment scrubbing', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  const previous = {
+    count: process.env.GIT_CONFIG_COUNT,
+    key: process.env.GIT_CONFIG_KEY_0,
+    value: process.env.GIT_CONFIG_VALUE_0,
+  }
+  try {
+    // The official scrub removes the KEY entry because its name matches the
+    // credential heuristic. The child must therefore not parse the inherited count.
+    process.env.GIT_CONFIG_COUNT = '1'
+    process.env.GIT_CONFIG_KEY_0 = 'user.name'
+    process.env.GIT_CONFIG_VALUE_0 = 'Devwork test'
+    const manifest = await workspaceManifest(r.cwd, SIGNAL)
+    assert.ok(manifest.entries.has('math.ts'))
+  } finally {
+    if (previous.count === undefined) delete process.env.GIT_CONFIG_COUNT
+    else process.env.GIT_CONFIG_COUNT = previous.count
+    if (previous.key === undefined) delete process.env.GIT_CONFIG_KEY_0
+    else process.env.GIT_CONFIG_KEY_0 = previous.key
+    if (previous.value === undefined) delete process.env.GIT_CONFIG_VALUE_0
+    else process.env.GIT_CONFIG_VALUE_0 = previous.value
+    await r.close()
+  }
+})
+
 test('fresh same-size real official capture cannot hide cumulative content changes', { timeout: 30_000 }, async t => {
   const r = await boot()
   try {

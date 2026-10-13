@@ -17,7 +17,10 @@ function absent(error: unknown): boolean { return error instanceof Error && 'cod
 /** Read only actual checkout bytes. Git supplies the bounded tracked/unignored namespace, never HEAD contents. */
 async function capture(cwd: string, signal: AbortSignal, retainedPaths: readonly string[]): Promise<WorkspaceManifest> {
   signal.throwIfAborted()
-  const options = { cwd, signal, env: scrubbedParentEnv(), maxBuffer: 4 * 1024 * 1024, timeout: 10_000 }
+  // scrubbedParentEnv removes GIT_CONFIG_KEY_* as credential-shaped names but
+  // intentionally leaves the matching count/value entries. Disable inherited
+  // command-line config entries so Git never sees a count without its keys.
+  const options = { cwd, signal, env: { ...scrubbedParentEnv(), GIT_CONFIG_COUNT: '0' }, maxBuffer: 4 * 1024 * 1024, timeout: 10_000 }
   const { stdout: rootOutput } = await run('git', ['rev-parse', '--show-toplevel'], options)
   const root = rootOutput.trim()
   if (resolve(cwd) !== resolve(root) || await realpath(cwd) !== resolve(cwd)) throw new Error('The POC requires cwd to be the canonical Git repository root')

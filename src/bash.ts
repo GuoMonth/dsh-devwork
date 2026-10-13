@@ -15,7 +15,11 @@ export async function guardedBash(ctx: Context, agent: Agent, exec: ToolRunConte
   try {
     guard()
     return await ctx.tools.execute({ callId, rootCallId: exec.rootCallId, parent: exec.token, agent, name: 'bash', signal,
-      arguments: { command, description, workdir: cwd, timeoutMs: 30_000 } })
+      // The official subprocess scrub removes GIT_CONFIG_KEY_* names as
+      // credential-shaped variables. Reset the inherited count inside the
+      // shell too, so Git commands in acceptance and delivery operations do
+      // not see a partial command-line configuration.
+      arguments: { command: `export GIT_CONFIG_COUNT=0\n${command}`, description, workdir: cwd, timeoutMs: 30_000 } })
   } finally { dispose() }
 }
 

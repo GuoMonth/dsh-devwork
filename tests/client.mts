@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { test } from 'node:test'
 import { Context, Service } from '@deepseek-ai/cordis'
@@ -54,7 +55,7 @@ test('Client factory: official slot registers lazily and disposes with its decla
     assert.ok(renderer(module))
     await ctx.plugin(module.SlotRegistry)
     await ctx.plugin(LocaleFixture)
-    const loaded = factory(new URL('../lib/client.js', import.meta.url).pathname)
+    const loaded = factory(fileURLToPath(new URL('../lib/client.js', import.meta.url)))
     assert.ok(client(loaded))
     assert.deepEqual([...loaded.inject], [...inject])
     const feature = await ctx.plugin({ inject: loaded.inject, apply: loaded.apply })
