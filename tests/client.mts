@@ -131,12 +131,12 @@ const projection = (status: TaskProjection['tasks'][number]['status'] = 'active'
   sessions: [{ id: 'session-root', taskId: 'root', externalSessionId: null, status: 'waiting' }, { id: 'session-child', taskId: 'child', externalSessionId: null, status: 'succeeded' }],
   attempts: [{ id: 'attempt-root', sessionId: 'session-root', agentId: 'writer', number: 1, status: 'waiting' }],
   artifacts: [
-    { id: 'artifact', taskId: 'root', attemptId: 'attempt-root', kind: 'commit', uri: 'commit:abc', status: 'ready' },
-    { id: 'check', taskId: 'root', attemptId: 'attempt-root', kind: 'test_result', uri: 'test:fast', status: 'accepted' },
+    { id: 'artifact', taskId: 'root', attemptId: 'attempt-root', kind: 'commit', uri: 'commit:abc', status: 'ready', source: { sessionId: 'session-root', attemptId: 'attempt-root' }, commit: { sha: 'abc', branch: 'task/root' }, checks: { status: 'passing', summary: 'fast checks', updatedAt: '2026-10-15T00:00:00.000Z' }, metadataVersion: 1 },
+    { id: 'check', taskId: 'root', attemptId: 'attempt-root', kind: 'test_result', uri: 'test:fast', status: 'accepted', source: { sessionId: 'session-root', attemptId: 'attempt-root' }, commit: { sha: 'abc', branch: 'task/root' }, checks: { status: 'passing', summary: 'fast checks', updatedAt: '2026-10-15T00:00:00.000Z' }, metadataVersion: 1 },
   ],
   integrations: [
-    { id: 'pr', taskId: 'root', artifactId: 'artifact', provider: 'github', url: 'https://github.com/example/repo/pull/1', status: 'open' },
-    { id: 'pr-closed', taskId: 'root', artifactId: 'artifact', provider: 'gitlab', url: 'https://gitlab.example/repo/merge_requests/2', status: 'closed' },
+    { id: 'pr', taskId: 'root', artifactId: 'artifact', provider: 'github', url: 'https://github.com/example/repo/pull/1', status: 'open', providerRef: '1', repository: 'example/repo', ref: 'task/root', targetRef: 'main', headSha: 'abc', checks: { status: 'passing', summary: 'fast checks', updatedAt: '2026-10-15T00:00:00.000Z' }, review: { status: 'pending', summary: null, updatedAt: null }, syncStatus: 'fresh', syncError: null, lastSyncedAt: '2026-10-15T00:00:00.000Z', mergedAt: null, closedAt: null },
+    { id: 'pr-closed', taskId: 'root', artifactId: 'artifact', provider: 'gitlab', url: 'https://gitlab.example/repo/merge_requests/2', status: 'closed', providerRef: '2', repository: 'example/repo', ref: 'task/root', targetRef: 'main', headSha: 'abc', checks: { status: 'unknown', summary: null, updatedAt: null }, review: { status: 'unknown', summary: null, updatedAt: null }, syncStatus: 'fresh', syncError: null, lastSyncedAt: '2026-10-15T00:00:00.000Z', mergedAt: null, closedAt: '2026-10-15T00:00:00.000Z' },
   ],
   leases: [{ id: 'lease', taskId: 'root', path: '/tmp/task-root', kind: 'worktree', status: 'released' }],
 })
