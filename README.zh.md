@@ -4,7 +4,7 @@
 
 基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的任务中心桌面开发工作台。以任务定义工作，通过 Session 树跟踪推进，在同一个地方查看和审查产出。
 
-**当前状态：任务中心重构，领域与执行基础层已实现。** [领域模型](docs/task-center.zh.md) 已提供任务与 Session 关系、独立生命周期状态、任务树投影、本地事件日志、确定性的嵌套任务接入和可 mock 的单执行者执行。桌面任务面板和 PR/MR 交付流程仍按[需求 #1](https://github.com/GuoMonth/dsh-devwork/issues/1) 重建。旧 headless POC 暂时保留接线用于回归验证；其脚本模型测试不证明自主规划或桌面渲染。目前没有发布 npm 版本。
+**当前状态：任务中心重构，领域与可注入执行基础层已实现。** [领域模型](docs/task-center.zh.md) 已提供任务与 Session 关系、独立生命周期状态、任务树投影、本地事件日志、确定性的嵌套任务接入和可 mock 的单执行者执行。执行层还不是 DSH Host 适配器。桌面任务面板和 PR/MR 交付流程仍按[需求 #1](https://github.com/GuoMonth/dsh-devwork/issues/1) 重建。旧 headless POC 暂时保留接线用于回归验证；其脚本模型测试不证明自主规划或桌面渲染。目前没有发布 npm 版本。
 
 ## 产品方向
 
