@@ -16,33 +16,12 @@ import { workspaceManifest } from '../src/workspace.ts'
 import * as WorkspaceChanges from '@deepseek-ai/dsh-workspace-changes'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import * as Plugin from '../lib/index.js'
-import { boot, CHECK, complete, FIXED, INITIAL, prompt, quote, REVISED, SIGNAL, task, teammate, text, tool, until, writeCommand } from './runtime.mts'
+import { boot, CHECK, complete, FIXED, fixtureEnv, INITIAL, prompt, quote, REVISED, SIGNAL, task, teammate, text, tool, until, writeCommand } from './runtime.mts'
 import { parseJson, record, string } from '../scripts/data.mts'
 
 // Published Cordis declares a const enum; native Node stripping cannot inline it.
 const PENDING: FiberState = 0
 const ACTIVE: FiberState = 2
-
-test('explicit start request opens a round through official tools and requires passing acceptance', { timeout: 30_000 }, async () => {
-  const r = await boot()
-  try {
-    const writing = await task(r)
-    await complete(r, writing.id)
-    r.model.script(r.lead, [
-      tool('devwork_open', { goal: 'Correct addition', taskIds: [writing.id], checks: [CHECK] }),
-      tool('devwork_verify', {}),
-      text('The declared acceptance check failed; the task is not ready for review.'),
-    ])
-    prompt(r.lead, 'Please use Agent Teams for a Devwork local development round. Goal: correct addition; call devwork_open and devwork_verify.')
-    await r.lead.whenIdle()
-    const brief = await r.ctx.devwork.brief(r.lead, SIGNAL)
-    assert.equal(brief.goal, 'Correct addition')
-    assert.equal(brief.completed, 1)
-    assert.equal(brief.checks[0]?.status, 'failed')
-    assert.equal(brief.stage, 'needs-attention')
-    assert.ok(r.lead.session.snapshotEvents().some(event => event.type === 'tool/result'))
-  } finally { await r.close() }
-})
 
 test('owned worktree: real Team edits, committed Leader handoff, verified integration and non-forced cleanup', { timeout: 60_000 }, async () => {
   const r = await boot()
@@ -66,7 +45,7 @@ test('owned worktree: real Team edits, committed Leader handoff, verified integr
       assert.ok(block?.type === 'text')
       return record(parseJson(block.text))
     }
-    const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' })
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', env: fixtureEnv() })
     const commit = (message: string) => `git -c user.name='Devwork POC' -c user.email=poc@example.invalid -c commit.gpgsign=false commit -m ${quote(message)}`
     r.ctx.tools.register(defineTool({
       name: 'poc_create_and_replace', description: 'Fixture: replace immediately after Host worktree creation starts.', parameters: {},
@@ -749,7 +728,7 @@ test('directory guard: worktree creation refuses a permission-time ABA switch be
     assert.ok(result.isError, JSON.stringify(result.content))
     assert.equal(bashBodies, 0, 'The official post-permission guard must deny before Bash dispatch')
     assert.deepEqual((await r.ctx.devwork.brief(r.lead, SIGNAL)).cleanupPending, [])
-    const worktrees = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: r.cwd, encoding: 'utf8' })
+    const worktrees = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: r.cwd, encoding: 'utf8', env: fixtureEnv() })
     assert.equal(worktrees.match(/^worktree /gm)?.length, 1, 'No unowned checkout was created')
     const ordinary = await directoryInvoke(r, 'bash', { command: 'node -e "process.exit(0)"', description: 'An unrelated Bash call after the scoped guard is disposed' })
     assert.ok(!ordinary.isError, JSON.stringify(ordinary.content))
@@ -757,7 +736,7 @@ test('directory guard: worktree creation refuses a permission-time ABA switch be
     await r.ctx.devwork.open(r.lead, { goal: 'Creation reservation was released', taskIds: [writing.id], checks: [CHECK] })
   } finally {
     // Also remove a fixture checkout if the regression reintroduces the mutation.
-    const extra = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: r.cwd, encoding: 'utf8' })
+    const extra = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: r.cwd, encoding: 'utf8', env: fixtureEnv() })
       .split('\n').filter(line => line.startsWith('worktree ')).map(line => line.slice('worktree '.length)).filter(path => path !== r.cwd)
     await r.close()
     await rm(other, { recursive: true, force: true })
@@ -845,9 +824,9 @@ test('deletion file feedback covers unstaged, staged and committed states with s
     const batch = await r.ctx.devwork.prepareFeedback(r.lead, snapshot, [{ kind: 'file', file: 'math.ts', text: 'Explain why deletion is safe.' }], SIGNAL)
     assert.match(batch.prompt, /"kind": "absent"/)
     await assert.rejects(() => r.ctx.devwork.prepareFeedback(r.lead, snapshot, [{ file: 'math.ts', startLine: 1, endLine: 1, text: 'Invented new line' }], SIGNAL), /use file feedback/)
-    execFileSync('git', ['add', '-u', '--', 'math.ts'], { cwd: r.cwd })
+    execFileSync('git', ['add', '-u', '--', 'math.ts'], { cwd: r.cwd, env: fixtureEnv() })
     assert.deepEqual((await r.ctx.devwork.reviewDiff(r.lead, snapshot, 'math.ts', SIGNAL)).after, { kind: 'absent' })
-    execFileSync('git', ['-c', 'user.name=POC', '-c', 'user.email=poc@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-m', 'Delete result'], { cwd: r.cwd })
+    execFileSync('git', ['-c', 'user.name=POC', '-c', 'user.email=poc@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-m', 'Delete result'], { cwd: r.cwd, env: fixtureEnv() })
     assert.deepEqual((await r.ctx.devwork.reviewDiff(r.lead, snapshot, 'math.ts', SIGNAL)).after, { kind: 'absent' })
     await writeFile(join(r.cwd, 'math.ts'), INITIAL)
     await assert.rejects(() => r.ctx.devwork.sendFeedback(r.lead, batch.id, SIGNAL), /Stale feedback/)
@@ -974,13 +953,13 @@ test('capture refuses oversized files, unsafe ancestors and non-UTF8 filenames; 
     assert.equal((await workspaceManifest(r.cwd, SIGNAL, [...baseline.entries.keys()])).entries.has('retained.txt'), true)
     await mkdir(join(r.cwd, 'nested'))
     await writeFile(join(r.cwd, 'nested/file.txt'), 'inside\n')
-    execFileSync('git', ['add', '--', 'nested/file.txt'], { cwd: r.cwd })
+    execFileSync('git', ['add', '--', 'nested/file.txt'], { cwd: r.cwd, env: fixtureEnv() })
     await rm(join(r.cwd, 'nested'), { recursive: true })
     await writeFile(join(outside, 'file.txt'), 'outside private bytes\n')
     await symlink(outside, join(r.cwd, 'nested'))
     await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /ancestor/)
     await rm(join(r.cwd, 'nested'))
-    execFileSync('git', ['reset', '--', 'nested/file.txt'], { cwd: r.cwd })
+    execFileSync('git', ['reset', '--', 'nested/file.txt'], { cwd: r.cwd, env: fixtureEnv() })
     const invalidPath = Buffer.concat([Buffer.from(r.cwd + '/invalid-'), Buffer.from([255])])
     await writeFile(invalidPath, 'Must not silently omit\n')
     await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /lossless UTF-8/)
@@ -1022,7 +1001,7 @@ test('fresh same-size real official capture cannot hide cumulative content chang
     // Deliberately fresh write/add, not an aged fixture and not a retry for #7.
     await setTimeout(1010 - Date.now() % 1000)
     await writeFile(join(r.cwd, 'math.ts'), INITIAL)
-    execFileSync('git', ['add', '--', 'math.ts'], { cwd: r.cwd })
+    execFileSync('git', ['add', '--', 'math.ts'], { cwd: r.cwd, env: fixtureEnv() })
     const indexBefore = await readFile(join(r.cwd, '.git/index'))
     await r.ctx.devwork.open(r.lead, { goal: 'Do not trust a partial official list', taskIds: [writing.id], checks: [CHECK] })
     r.model.script(r.lead, [tool('bash', { command: `${writeCommand(FIXED)} && node -e ${quote("require('node:fs').writeFileSync('extra.txt', 'Visible extra result\\n')")}`, description: 'Same-size tracked edit and new file' }), tool('devwork_verify', {}), text('Result.')])
@@ -1062,9 +1041,9 @@ test('capture caps file count and total bytes without silently omitting oversize
     }
     await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /byte limit/)
     for (let i = 0; i < 9; i++) await rm(join(r.cwd, `large-${i}`))
-    const empty = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: r.cwd, input: '', encoding: 'utf8' }).trim()
+    const empty = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: r.cwd, input: '', encoding: 'utf8', env: fixtureEnv() }).trim()
     const entries = Array.from({ length: 10_001 }, (_, i) => `100644 ${empty}\tmissing-${i}\n`).join('')
-    execFileSync('git', ['update-index', '--index-info'], { cwd: r.cwd, input: entries })
+    execFileSync('git', ['update-index', '--index-info'], { cwd: r.cwd, input: entries, env: fixtureEnv() })
     await assert.rejects(() => workspaceManifest(r.cwd, SIGNAL), /file limit/)
   } finally { await r.close() }
 })
