@@ -1,5 +1,5 @@
-export type TaskStatus = 'pending' | 'active' | 'blocked' | 'review' | 'completed' | 'cancelled'
-export type AttemptStatus = 'running' | 'waiting' | 'succeeded' | 'failed' | 'cancelled'
+export type TaskStatus = 'pending' | 'active' | 'paused' | 'blocked' | 'failed' | 'review' | 'completed' | 'cancelled'
+export type AttemptStatus = 'running' | 'waiting' | 'paused' | 'succeeded' | 'failed' | 'cancelled'
 export type SessionStatus = 'idle' | AttemptStatus
 export type ArtifactStatus = 'draft' | 'ready' | 'accepted' | 'superseded'
 export type IntegrationStatus = 'draft' | 'open' | 'merged' | 'closed'
@@ -16,6 +16,9 @@ export interface Task {
   readonly scope: readonly string[]
   readonly acceptance: readonly string[]
   readonly dependencyIds: readonly string[]
+  /** The execution boundary is descriptive metadata; the engine never changes a Session cwd. */
+  readonly workingDirectory?: string | null
+  readonly executionBoundary?: string | null
   readonly status: TaskStatus
   readonly blockedReason: string | null
 }
@@ -74,14 +77,37 @@ export interface TaskProjection {
   readonly leases: readonly WorkspaceLease[]
 }
 
+export interface TaskRegistration {
+  readonly id: string
+  readonly parentId: string | null
+  readonly title: string
+  readonly goal: string
+  readonly scope: readonly string[]
+  readonly acceptance: readonly string[]
+  readonly dependencyIds: readonly string[]
+  readonly workingDirectory: string | null
+  readonly executionBoundary: string | null
+  readonly sessionId: string
+}
+
+export type ExecutionOutcome = 'succeeded' | 'paused' | 'blocked' | 'failed' | 'cancelled'
+
 export type TaskCommand =
-  | { readonly type: 'task.create'; readonly id: string; readonly parentId: string | null; readonly title: string; readonly goal: string; readonly scope: readonly string[]; readonly acceptance: readonly string[]; readonly dependencyIds: readonly string[] }
+  | { readonly type: 'task.create'; readonly id: string; readonly parentId: string | null; readonly title: string; readonly goal: string; readonly scope: readonly string[]; readonly acceptance: readonly string[]; readonly dependencyIds: readonly string[]; readonly workingDirectory?: string | null; readonly executionBoundary?: string | null }
+  | { readonly type: 'task.intake'; readonly tasks: readonly TaskRegistration[] }
   | { readonly type: 'task.reparent'; readonly taskId: string; readonly parentId: string | null }
-  | { readonly type: 'task.transition'; readonly taskId: string; readonly status: Exclude<TaskStatus, 'blocked'> }
+  | { readonly type: 'task.transition'; readonly taskId: string; readonly status: Exclude<TaskStatus, 'blocked' | 'paused' | 'failed'> }
+  | { readonly type: 'task.continue'; readonly taskId: string }
+  | { readonly type: 'task.pause'; readonly taskId: string }
   | { readonly type: 'task.block'; readonly taskId: string; readonly reason: string }
+  | { readonly type: 'task.fail'; readonly taskId: string; readonly reason: string }
+  | { readonly type: 'task.cancel'; readonly taskId: string }
+  | { readonly type: 'task.retry'; readonly id: string; readonly taskId: string; readonly agentId: string }
   | { readonly type: 'session.create'; readonly id: string; readonly taskId: string; readonly externalSessionId: string | null }
+  | { readonly type: 'session.bind'; readonly sessionId: string; readonly externalSessionId: string }
   | { readonly type: 'attempt.start'; readonly id: string; readonly sessionId: string; readonly agentId: string }
   | { readonly type: 'attempt.transition'; readonly attemptId: string; readonly status: AttemptStatus }
+  | { readonly type: 'execution.settle'; readonly attemptId: string; readonly outcome: ExecutionOutcome; readonly reason: string | null }
   | { readonly type: 'artifact.create'; readonly id: string; readonly taskId: string; readonly attemptId: string | null; readonly kind: ArtifactKind; readonly uri: string }
   | { readonly type: 'artifact.transition'; readonly artifactId: string; readonly status: ArtifactStatus }
   | { readonly type: 'integration.create'; readonly id: string; readonly taskId: string; readonly artifactId: string | null; readonly provider: IntegrationProvider; readonly url: string }

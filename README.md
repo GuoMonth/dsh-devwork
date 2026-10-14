@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 A task-centered desktop development workspace built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Define work as tasks, follow their Session tree, and review outputs in one place.
 
-**Status: task-center rewrite, foundation implemented.** The [domain model](docs/task-center.md) now provides task/Session relationships, independent lifecycle states, a task-tree projection, and a local event log. The execution engine, desktop task panel, and PR/MR delivery flow are being rebuilt under [request #1](https://github.com/GuoMonth/dsh-devwork/issues/1). The old headless POC remains temporarily wired for regression coverage; its scripted-model tests do not prove autonomous planning or desktop rendering. No npm release has been published.
+**Status: task-center rewrite, domain and execution foundation implemented.** The [domain model](docs/task-center.md) provides task/Session relationships, independent lifecycle states, a task-tree projection, a local event log, deterministic nested task intake, and mockable single-executor execution. The desktop task panel and PR/MR delivery flow are being rebuilt under [request #1](https://github.com/GuoMonth/dsh-devwork/issues/1). The old headless POC remains temporarily wired for regression coverage; its scripted-model tests do not prove autonomous planning or desktop rendering. No npm release has been published.
 
 ## Direction
 

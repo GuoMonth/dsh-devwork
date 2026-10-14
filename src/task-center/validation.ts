@@ -1,5 +1,5 @@
 import { TaskDomainError } from './types.js'
-import type { TaskCommand, TaskEvent, TaskLog } from './types.js'
+import type { TaskCommand, TaskEvent, TaskLog, TaskRegistration } from './types.js'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -12,9 +12,9 @@ function record(value: unknown): Record<string, unknown> {
   return value
 }
 
-function fields(value: Record<string, unknown>, names: readonly string[]): void {
+function fields(value: Record<string, unknown>, names: readonly string[], optional: readonly string[] = []): void {
   for (const key of Object.keys(value)) {
-    if (!names.includes(key)) throw new TaskDomainError(`Unknown field: ${key}`)
+    if (!names.includes(key) && !optional.includes(key)) throw new TaskDomainError(`Unknown field: ${key}`)
   }
   for (const key of names) {
     if (!Object.hasOwn(value, key)) throw new TaskDomainError(`Missing field: ${key}`)
@@ -43,27 +43,47 @@ function choice<T extends string>(value: unknown, choices: readonly T[]): T {
 export function parseCommand(input: unknown): TaskCommand {
   const value = record(input)
   switch (value.type) {
+    case 'task.intake':
+      fields(value, ['type', 'tasks'])
+      return { type: value.type, tasks: list(value.tasks).map(parseRegistration) }
     case 'task.create':
-      fields(value, ['type', 'id', 'parentId', 'title', 'goal', 'scope', 'acceptance', 'dependencyIds'])
-      return { type: value.type, id: text(value.id), parentId: nullableText(value.parentId), title: text(value.title), goal: text(value.goal), scope: textList(value.scope), acceptance: textList(value.acceptance), dependencyIds: textList(value.dependencyIds) }
+      fields(value, ['type', 'id', 'parentId', 'title', 'goal', 'scope', 'acceptance', 'dependencyIds'], ['workingDirectory', 'executionBoundary'])
+      return { type: value.type, id: text(value.id), parentId: nullableText(value.parentId), title: text(value.title), goal: text(value.goal), scope: textList(value.scope), acceptance: textList(value.acceptance), dependencyIds: textList(value.dependencyIds), workingDirectory: value.workingDirectory === undefined ? null : nullableText(value.workingDirectory), executionBoundary: value.executionBoundary === undefined ? null : nullableText(value.executionBoundary) }
     case 'task.reparent':
       fields(value, ['type', 'taskId', 'parentId'])
       return { type: value.type, taskId: text(value.taskId), parentId: nullableText(value.parentId) }
     case 'task.transition':
       fields(value, ['type', 'taskId', 'status'])
       return { type: value.type, taskId: text(value.taskId), status: choice(value.status, ['pending', 'active', 'review', 'completed', 'cancelled']) }
+    case 'task.continue':
+    case 'task.pause':
+    case 'task.cancel':
+      fields(value, ['type', 'taskId'])
+      return { type: value.type, taskId: text(value.taskId) }
     case 'task.block':
       fields(value, ['type', 'taskId', 'reason'])
       return { type: value.type, taskId: text(value.taskId), reason: text(value.reason) }
+    case 'task.fail':
+      fields(value, ['type', 'taskId', 'reason'])
+      return { type: value.type, taskId: text(value.taskId), reason: text(value.reason) }
+    case 'task.retry':
+      fields(value, ['type', 'id', 'taskId', 'agentId'])
+      return { type: value.type, id: text(value.id), taskId: text(value.taskId), agentId: text(value.agentId) }
     case 'session.create':
       fields(value, ['type', 'id', 'taskId', 'externalSessionId'])
       return { type: value.type, id: text(value.id), taskId: text(value.taskId), externalSessionId: nullableText(value.externalSessionId) }
+    case 'session.bind':
+      fields(value, ['type', 'sessionId', 'externalSessionId'])
+      return { type: value.type, sessionId: text(value.sessionId), externalSessionId: text(value.externalSessionId) }
     case 'attempt.start':
       fields(value, ['type', 'id', 'sessionId', 'agentId'])
       return { type: value.type, id: text(value.id), sessionId: text(value.sessionId), agentId: text(value.agentId) }
     case 'attempt.transition':
       fields(value, ['type', 'attemptId', 'status'])
-      return { type: value.type, attemptId: text(value.attemptId), status: choice(value.status, ['running', 'waiting', 'succeeded', 'failed', 'cancelled']) }
+      return { type: value.type, attemptId: text(value.attemptId), status: choice(value.status, ['running', 'waiting', 'paused', 'succeeded', 'failed', 'cancelled']) }
+    case 'execution.settle':
+      fields(value, ['type', 'attemptId', 'outcome', 'reason'])
+      return { type: value.type, attemptId: text(value.attemptId), outcome: choice(value.outcome, ['succeeded', 'paused', 'blocked', 'failed', 'cancelled']), reason: nullableText(value.reason) }
     case 'artifact.create':
       fields(value, ['type', 'id', 'taskId', 'attemptId', 'kind', 'uri'])
       return { type: value.type, id: text(value.id), taskId: text(value.taskId), attemptId: nullableText(value.attemptId), kind: choice(value.kind, ['patch', 'commit', 'note', 'test_result']), uri: text(value.uri) }
@@ -91,6 +111,12 @@ export function parseCommand(input: unknown): TaskCommand {
     default:
       throw new TaskDomainError('Unknown command type')
   }
+}
+
+function parseRegistration(input: unknown): TaskRegistration {
+  const value = record(input)
+  fields(value, ['id', 'parentId', 'title', 'goal', 'scope', 'acceptance', 'dependencyIds', 'workingDirectory', 'executionBoundary', 'sessionId'])
+  return { id: text(value.id), parentId: nullableText(value.parentId), title: text(value.title), goal: text(value.goal), scope: textList(value.scope), acceptance: textList(value.acceptance), dependencyIds: textList(value.dependencyIds), workingDirectory: nullableText(value.workingDirectory), executionBoundary: nullableText(value.executionBoundary), sessionId: text(value.sessionId) }
 }
 
 function list(value: unknown): unknown[] {
