@@ -2,11 +2,32 @@ export type TaskStatus = 'pending' | 'active' | 'paused' | 'blocked' | 'failed' 
 export type AttemptStatus = 'running' | 'waiting' | 'paused' | 'succeeded' | 'failed' | 'cancelled'
 export type SessionStatus = 'idle' | AttemptStatus
 export type ArtifactStatus = 'draft' | 'ready' | 'accepted' | 'superseded'
-export type IntegrationStatus = 'draft' | 'open' | 'merged' | 'closed'
+/** The integration status is the last known remote state. Sync uncertainty is
+ * kept separately on IntegrationRef so a transport error never erases truth. */
+export type IntegrationStatus = 'draft' | 'open' | 'checks_failed' | 'reviewable' | 'changes_requested' | 'approved' | 'merged' | 'closed' | 'unknown'
+export type IntegrationSyncStatus = 'fresh' | 'uncertain'
+export type DeliveryCheckStatus = 'pending' | 'passing' | 'failing' | 'unknown'
+export type DeliveryReviewStatus = 'pending' | 'approved' | 'changes_requested' | 'unknown'
 export type LeaseStatus = 'reserved' | 'active' | 'released'
-export type ArtifactKind = 'patch' | 'commit' | 'note' | 'test_result'
+export type ArtifactKind = 'patch' | 'commit' | 'note' | 'test_result' | 'build' | 'summary'
 export type IntegrationProvider = 'github' | 'gitlab'
 export type WorkspaceKind = 'existing' | 'worktree'
+
+export interface ArtifactSource {
+  readonly sessionId: string | null
+  readonly attemptId: string | null
+}
+
+export interface ArtifactCommit {
+  readonly sha: string | null
+  readonly branch: string | null
+}
+
+export interface DeliveryChecks {
+  readonly status: DeliveryCheckStatus
+  readonly summary: string | null
+  readonly updatedAt: string | null
+}
 
 export interface Task {
   readonly id: string
@@ -46,6 +67,11 @@ export interface TaskArtifact {
   readonly kind: ArtifactKind
   readonly uri: string
   readonly status: ArtifactStatus
+  /** Durable provenance retained after a workspace lease is released. */
+  readonly source: ArtifactSource
+  readonly commit: ArtifactCommit
+  readonly checks: DeliveryChecks
+  readonly metadataVersion: 1
 }
 
 export interface IntegrationRef {
@@ -55,6 +81,19 @@ export interface IntegrationRef {
   readonly provider: IntegrationProvider
   readonly url: string
   readonly status: IntegrationStatus
+  /** Provider-native number/IID, persisted independently of the URL. */
+  readonly providerRef: string
+  readonly repository: string
+  readonly ref: string
+  readonly targetRef: string
+  readonly headSha: string
+  readonly checks: DeliveryChecks
+  readonly review: { readonly status: DeliveryReviewStatus; readonly summary: string | null; readonly updatedAt: string | null }
+  readonly syncStatus: IntegrationSyncStatus
+  readonly syncError: string | null
+  readonly lastSyncedAt: string | null
+  readonly mergedAt: string | null
+  readonly closedAt: string | null
 }
 
 // Reservation is persisted before a host starts creating a worktree.
@@ -108,9 +147,11 @@ export type TaskCommand =
   | { readonly type: 'attempt.start'; readonly id: string; readonly sessionId: string; readonly agentId: string }
   | { readonly type: 'attempt.transition'; readonly attemptId: string; readonly status: AttemptStatus }
   | { readonly type: 'execution.settle'; readonly attemptId: string; readonly outcome: ExecutionOutcome; readonly reason: string | null }
-  | { readonly type: 'artifact.create'; readonly id: string; readonly taskId: string; readonly attemptId: string | null; readonly kind: ArtifactKind; readonly uri: string }
+  | { readonly type: 'artifact.create'; readonly id: string; readonly taskId: string; readonly attemptId: string | null; readonly kind: ArtifactKind; readonly uri: string; readonly source?: ArtifactSource | undefined; readonly commit?: ArtifactCommit | undefined; readonly checks?: DeliveryChecks | undefined }
+  | { readonly type: 'artifact.sync'; readonly artifactId: string; readonly source?: ArtifactSource | undefined; readonly commit?: ArtifactCommit | undefined; readonly checks?: DeliveryChecks | undefined; readonly uri?: string | undefined }
   | { readonly type: 'artifact.transition'; readonly artifactId: string; readonly status: ArtifactStatus }
-  | { readonly type: 'integration.create'; readonly id: string; readonly taskId: string; readonly artifactId: string | null; readonly provider: IntegrationProvider; readonly url: string }
+  | { readonly type: 'integration.create'; readonly id: string; readonly taskId: string; readonly artifactId: string | null; readonly provider: IntegrationProvider; readonly url: string; readonly providerRef?: string | undefined; readonly repository?: string | undefined; readonly ref?: string | undefined; readonly targetRef?: string | undefined; readonly headSha?: string | undefined }
+  | { readonly type: 'integration.sync'; readonly integrationId: string; readonly status?: IntegrationStatus | undefined; readonly headSha?: string | undefined; readonly checks?: DeliveryChecks | undefined; readonly review?: { readonly status: DeliveryReviewStatus; readonly summary: string | null; readonly updatedAt: string | null } | undefined; readonly syncStatus: IntegrationSyncStatus; readonly syncError?: string | null | undefined; readonly lastSyncedAt?: string | null | undefined; readonly mergedAt?: string | null | undefined; readonly closedAt?: string | null | undefined }
   | { readonly type: 'integration.transition'; readonly integrationId: string; readonly status: IntegrationStatus }
   | { readonly type: 'lease.reserve'; readonly id: string; readonly taskId: string; readonly path: string; readonly kind: WorkspaceKind }
   | { readonly type: 'lease.activate'; readonly leaseId: string }

@@ -1,6 +1,6 @@
 import { artifactTransitions, attemptTransitions, integrationTransitions, requireTransition, sessionTransitions, taskTransitions } from './transitions.js'
 import { TaskDomainError } from './types.js'
-import type { AgentAttempt, AttemptStatus, IntegrationRef, Task, TaskArtifact, TaskEvent, TaskLog, TaskProjection, TaskSession, TaskStatus, WorkspaceLease } from './types.js'
+import type { AgentAttempt, ArtifactCommit, ArtifactSource, AttemptStatus, DeliveryChecks, IntegrationRef, Task, TaskArtifact, TaskEvent, TaskLog, TaskProjection, TaskSession, TaskStatus, WorkspaceLease } from './types.js'
 
 function duplicate(kind: string, id: string): never { throw new TaskDomainError(`Duplicate ${kind}: ${id}`) }
 function missing(kind: string, id: string): never { throw new TaskDomainError(`Unknown ${kind}: ${id}`) }
@@ -56,6 +56,10 @@ function assertTaskOrder(tasks: Map<string, Task>): void {
   }
   for (const id of tasks.keys()) visit(id)
 }
+
+const emptyChecks = (): DeliveryChecks => ({ status: 'pending', summary: null, updatedAt: null })
+const emptySource = (): ArtifactSource => ({ sessionId: null, attemptId: null })
+const emptyCommit = (): ArtifactCommit => ({ sha: null, branch: null })
 
 function initial(): TaskProjection { return { revision: 0, tasks: [], sessions: [], attempts: [], artifacts: [], integrations: [], leases: [] } }
 
@@ -234,7 +238,20 @@ export function applyEvent(previous: TaskProjection, event: TaskEvent): TaskProj
       if (artifacts.has(command.id)) duplicate('artifact', command.id)
       task(tasks, command.taskId)
       if (command.attemptId !== null && session(sessions, attempt(attempts, command.attemptId).sessionId).taskId !== command.taskId) throw new TaskDomainError('Artifact attempt belongs to another task')
-      artifacts.set(command.id, { id: command.id, taskId: command.taskId, attemptId: command.attemptId, kind: command.kind, uri: command.uri, status: 'draft' })
+      if (command.source !== undefined) {
+        if (command.source.sessionId !== null && session(sessions, command.source.sessionId).taskId !== command.taskId) throw new TaskDomainError('Artifact source Session belongs to another task')
+        if (command.source.attemptId !== null) {
+          const sourceAttempt = attempt(attempts, command.source.attemptId)
+          const sourceSession = session(sessions, sourceAttempt.sessionId)
+          if (sourceSession.taskId !== command.taskId || (command.source.sessionId !== null && sourceAttempt.sessionId !== command.source.sessionId)) throw new TaskDomainError('Artifact source Attempt belongs to another task or Session')
+        }
+      }
+      artifacts.set(command.id, { id: command.id, taskId: command.taskId, attemptId: command.attemptId, kind: command.kind, uri: command.uri, status: 'draft', source: command.source ?? { sessionId: command.attemptId === null ? null : session(sessions, attempt(attempts, command.attemptId).sessionId).id, attemptId: command.attemptId }, commit: command.commit ?? emptyCommit(), checks: command.checks ?? emptyChecks(), metadataVersion: 1 })
+      break
+    }
+    case 'artifact.sync': {
+      const current = artifact(artifacts, command.artifactId)
+      replace(artifacts, { ...current, source: command.source ?? current.source, commit: command.commit ?? current.commit, checks: command.checks ?? current.checks, uri: command.uri ?? current.uri })
       break
     }
     case 'artifact.transition': {
@@ -247,7 +264,13 @@ export function applyEvent(previous: TaskProjection, event: TaskEvent): TaskProj
       if (integrations.has(command.id)) duplicate('integration', command.id)
       const owner = task(tasks, command.taskId)
       if (command.artifactId !== null && artifact(artifacts, command.artifactId).taskId !== owner.id) throw new TaskDomainError('Integration artifact belongs to another task')
-      integrations.set(command.id, { id: command.id, taskId: owner.id, artifactId: command.artifactId, provider: command.provider, url: command.url, status: 'draft' })
+      integrations.set(command.id, { id: command.id, taskId: owner.id, artifactId: command.artifactId, provider: command.provider, url: command.url, status: 'draft', providerRef: command.providerRef ?? command.id, repository: command.repository ?? '', ref: command.ref ?? '', targetRef: command.targetRef ?? '', headSha: command.headSha ?? '', checks: emptyChecks(), review: { status: 'pending', summary: null, updatedAt: null }, syncStatus: 'fresh', syncError: null, lastSyncedAt: null, mergedAt: null, closedAt: null })
+      break
+    }
+    case 'integration.sync': {
+      const current = integration(integrations, command.integrationId)
+      const nextStatus = command.status ?? current.status
+      replace(integrations, { ...current, status: nextStatus, headSha: command.headSha ?? current.headSha, checks: command.checks ?? current.checks, review: command.review ?? current.review, syncStatus: command.syncStatus, syncError: command.syncError ?? null, lastSyncedAt: command.lastSyncedAt ?? null, mergedAt: command.mergedAt === undefined ? current.mergedAt : command.mergedAt, closedAt: command.closedAt === undefined ? current.closedAt : command.closedAt })
       break
     }
     case 'integration.transition': {

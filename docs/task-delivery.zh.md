@@ -51,3 +51,15 @@ pnpm run verify
 pnpm run pack:check
 pnpm pack --dry-run
 ```
+
+## Artifact 与 PR/MR 交付
+
+交付记录属于任务事件投影。Artifact 保存来源 Session、Attempt、commit SHA 与 branch、检查结果和 URI，因此释放 workspace lease 后仍可查看。PR/MR Integration 还保存 provider 原生引用、仓库、源与目标 ref、head SHA、检查和审查摘要、时间戳以及远端最后已知状态。
+
+GitHub 与 GitLab adapter 通过注入的 `fetch` 和 credentials 调用官方 REST API。响应在 `unknown` 边界严格校验，凭据不会进入错误或请求记录。创建按 task/provider/repository/source/target 幂等，刷新写回同一份投影；网络失败会标记同步不确定，同时保留之前的状态。
+
+合并授权是独立的可信边界。`authorizeMerge` 将授权绑定到 provider、仓库、源 ref 和 head SHA；Agent 传入的 boolean 会被拒绝。服务会先刷新 provider，并在调用 merge 前重新比较当前 head；head 改变后必须重新获得用户授权。
+
+清理使用注入的官方工具 adapter。代码任务必须已有持久化 Artifact、状态新鲜且检查通过的 merged Integration、通过验收、owned active lease，以及干净、已推送并完整交付的工作区。dirty、未推送、closed-unmerged、检查失败、需修改、unknown 或不确定状态都会保留现场。lease 释放后重复清理安全，不会再次删除工作区。
+
+Host 仍需为这些交付服务和 UI 投影提供显式绑定。当前实现是带 mock 与 HTTP 合约覆盖的持久化领域/服务层；尚未实现可宣称的桌面 PR/MR 实际流程或真实 provider 写入验收。

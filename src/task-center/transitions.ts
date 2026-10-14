@@ -39,10 +39,15 @@ export const artifactTransitions: Readonly<Record<ArtifactStatus, readonly Artif
 }
 
 export const integrationTransitions: Readonly<Record<IntegrationStatus, readonly IntegrationStatus[]>> = {
-  draft: ['open', 'closed'],
-  open: ['draft', 'merged', 'closed'],
+  draft: ['draft', 'open', 'checks_failed', 'reviewable', 'changes_requested', 'approved', 'closed'],
+  open: ['draft', 'open', 'checks_failed', 'reviewable', 'changes_requested', 'approved', 'merged', 'closed', 'unknown'],
+  checks_failed: ['open', 'checks_failed', 'reviewable', 'changes_requested', 'approved', 'merged', 'closed', 'unknown'],
+  reviewable: ['open', 'checks_failed', 'reviewable', 'changes_requested', 'approved', 'merged', 'closed', 'unknown'],
+  changes_requested: ['open', 'checks_failed', 'reviewable', 'changes_requested', 'approved', 'merged', 'closed', 'unknown'],
+  approved: ['open', 'checks_failed', 'reviewable', 'changes_requested', 'approved', 'merged', 'closed', 'unknown'],
   merged: [],
-  closed: ['open'],
+  closed: ['open', 'closed', 'unknown'],
+  unknown: ['draft', 'open', 'checks_failed', 'reviewable', 'changes_requested', 'approved', 'merged', 'closed', 'unknown'],
 }
 
 export function requireTransition<T extends string>(table: Readonly<Record<T, readonly T[]>>, from: T, to: T): void {

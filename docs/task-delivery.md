@@ -51,3 +51,15 @@ pnpm run verify
 pnpm run pack:check
 pnpm pack --dry-run
 ```
+
+## Artifact and PR/MR delivery
+
+Delivery records are part of the task event projection. An Artifact keeps its source Session and Attempt, commit SHA and branch, checks, and URI, so it remains inspectable after the workspace lease is released. A PR/MR Integration adds the provider-native reference, repository, source and target refs, head SHA, check and review summaries, timestamps, and the last known remote state.
+
+GitHub and GitLab adapters use their documented REST APIs through injected `fetch` and credentials. Responses are validated at the `unknown` boundary, and credentials are never included in errors or request records. Create is keyed by task/provider/repository/source/target and refresh writes the same projection; a transport failure marks synchronization uncertain while retaining the previous state.
+
+Merge authorization is a separate trusted boundary. `authorizeMerge` binds the provider, repository, source ref, and head SHA; a boolean from an Agent is rejected. The service refreshes the provider and compares the current head before invoking merge, so a changed head requires fresh user authorization.
+
+Cleanup accepts an injected official-tool adapter. It requires persisted Artifacts, a fresh merged Integration with passing checks for code tasks, passing acceptance, an owned active lease, and a clean, pushed, fully delivered workspace. Dirty, unpushed, closed-unmerged, check-failed, changes-requested, unknown, or uncertain work remains visible. Repeated cleanup after release is safe and does not remove a workspace a second time.
+
+The Host still needs explicit bindings for these delivery services and UI projections. The current implementation is a durable domain/service layer with mock and HTTP contract coverage; it does not claim a live desktop PR/MR workflow or real provider writes.
