@@ -46,8 +46,8 @@ Rounds and ownership leases remain ephemeral. Unload cancels/drains operations w
 `tests/headless.mts` uses a scripted model with real Team/Bash/Git to exercise task-checkout edits, Leader integration, committed summaries, target verification and removal. It covers stale handoffs, missing integration/summary, dirty state, official denial, concurrent/repeated calls and preservation of preexisting user edits. Real-model path discipline, summary quality and native desktop behavior remain pending.
 
 ```sh
-npm ci
-npm run verify
-npm run pack:check
-npm pack --dry-run
+pnpm install --frozen-lockfile
+pnpm run verify
+pnpm run pack:check
+pnpm pack --dry-run
 ```

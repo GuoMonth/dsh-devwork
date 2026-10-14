@@ -35,6 +35,10 @@ function renderer(value: unknown): value is { SlotRegistry: new (ctx: Context) =
 function client(value: unknown): value is { apply: (ctx: Context) => void; inject: string[] } {
   return typeof value === 'object' && value !== null && 'apply' in value && typeof value.apply === 'function' && 'inject' in value && Array.isArray(value.inject) && value.inject.every(item => typeof item === 'string')
 }
+function localeFixture(value: unknown): value is LocaleFixture {
+  if (typeof value !== 'object' || value === null || !('dictionaries' in value)) return false
+  return value.dictionaries instanceof Map
+}
 
 /** Locale boundary fixture; SlotRegistry and Cordis are production implementations. */
 class LocaleFixture extends Service {
@@ -82,9 +86,9 @@ test('UI is an editable explicit request, preserves insertion revision and never
     await ctx.plugin(module.SlotRegistry)
     const locale = await ctx.plugin(LocaleFixture)
     const feature = await ctx.plugin({ inject, apply })
-    const instance = locale.ctx.get('locale')
+    const instance: unknown = locale.ctx.get('locale')
     // Use this fixture's concrete provider only to inspect its owned dictionaries.
-    assert.ok(instance instanceof LocaleFixture)
+    if (!localeFixture(instance)) throw new Error('Locale fixture was not registered')
     const dictionary = instance.dictionaries.get('dsh-devwork')?.zh
     assert.ok(dictionary)
     const insertions: string[] = []
@@ -106,6 +110,7 @@ test('UI is an editable explicit request, preserves insertion revision and never
     else throw new Error('Unexpected browser-event dependency')
     assert.equal(insertions.length, 1)
     assert.match(insertions[0] ?? '', /请使用 Agent Teams/)
+    assert.match(insertions[0] ?? '', /devwork_open.*devwork_verify/)
     assert.equal(submissions, 0)
     assert.match(renderToStaticMarkup(createElement(StartAction, props)), /Devwork/)
     await feature.dispose()
