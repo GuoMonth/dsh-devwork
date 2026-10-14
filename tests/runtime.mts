@@ -31,6 +31,9 @@ export const INITIAL = 'export function add(a: number, b: number): number { retu
 export const FIXED = 'export function add(a: number, b: number): number { return a + b }\n'
 export const REVISED = '// Reviewed: preserve zero and negative inputs.\n' + FIXED
 
+/** Fixture Git commands must not inherit DSH's credential-shaped config count. */
+export function fixtureEnv(): NodeJS.ProcessEnv { return { ...process.env, GIT_CONFIG_COUNT: '0' } }
+
 /** Independent deterministic model fixture; all domain services remain real. */
 export class ScriptedModel extends LlmAdapter {
   readonly requests: GenerateOptions[] = []
@@ -57,7 +60,9 @@ export function text(value: string): StreamChunk[] {
 let call = 0
 export function tool(name: string, args: object): StreamChunk[] {
   const id = ToolCallId(`poc-model-${++call}`)
-  const json = JSON.stringify(args)
+  const command = 'command' in args && typeof args.command === 'string' ? args.command : undefined
+  const normalized = name === 'bash' && command !== undefined ? { ...args, command: `export GIT_CONFIG_COUNT=0\n${command}` } : args
+  const json = JSON.stringify(normalized)
   return [
     { type: 'block-start', index: 0, blockType: 'tool-call' },
     { type: 'tool-call-delta', index: 0, id, name, argumentsDelta: json },
@@ -85,7 +90,7 @@ export async function boot(options: { plugin?: boolean; changes?: boolean; maxFi
   const logs: string[] = []
   ctx.logger.exporter({ levels: { default: 3 }, export: message => { if (message.type !== 'debug') logs.push(message.args.map(String).join(' ')) } })
   try {
-    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Devwork POC', '-c', 'user.email=poc@example.invalid', '-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8' })
+    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Devwork POC', '-c', 'user.email=poc@example.invalid', '-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8', env: fixtureEnv() })
     git('init', '-q', '-b', 'main')
     await writeFile(join(cwd, 'math.ts'), INITIAL)
     // Model an existing repository, not a just-indexed same-second file.

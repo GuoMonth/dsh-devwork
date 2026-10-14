@@ -67,10 +67,10 @@ Host API：`ctx.devwork.open/brief/review/reviewDiff/prepareFeedback/sendFeedbac
 ## 复现与验证边界
 
 ```sh
-npm ci
-npm run verify
-npm run pack:check
-npm pack --dry-run
+pnpm install --frozen-lockfile
+pnpm run verify
+pnpm run pack:check
+pnpm pack --dry-run
 ```
 
 此前 headless 运行建立了以下基线行为证据。下面第 8–9 项的官方绑定行为已被上述独立累计审查契约替代，保留为历史证据，不代表当前验收结论。当前实现需重新执行上述命令验证。

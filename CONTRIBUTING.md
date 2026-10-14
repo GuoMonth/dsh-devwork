@@ -1,13 +1,13 @@
 # Contributing / 参与贡献
 
-Use Node.js 24.x only and the locked npm dependencies:
+Use Node.js 24.x only and the locked pnpm dependencies:
 
-仅使用 Node.js 24.x，按锁文件安装依赖：
+仅使用 Node.js 24.x，按 pnpm 锁文件安装依赖：
 
 ```sh
-npm ci
-npm run verify
-npm pack --dry-run
+pnpm install --frozen-lockfile
+pnpm run verify
+pnpm pack --dry-run
 ```
 
 `verify` checks types, builds the standalone package, validates exports with publint, and checks bundle artifacts. It does not exercise a DSH desktop session. Product changes need checks for the behavior they introduce.
@@ -39,9 +39,9 @@ PRs should use `Closes #development-number` and `Related to #request-number`. Cl
 
 PR 使用 `Closes #开发编号`、`Related to #需求编号`。开发任务以交付和验证证据关闭；需求以约定的用户验收条件关闭，接受需求或完成其中一个任务都不代表需求完成。可直接修复的小 bug 可以保留单个需求 issue，确有独立规划或多个任务时再拆分。新建前先搜索重复议题；当前不增加状态或优先级标签体系。
 
-Source and scripts use strict TypeScript 7.0.2. Node 24 runs the `.mts` scripts directly, but does not type-check them; `npm run typecheck` checks both programs. Treat external data as `unknown` and narrow it with runtime checks. Avoid explicit `any`, blanket type assertions, and error suppressions. Prefer straightforward domain types.
+Source and scripts use strict TypeScript 7.0.2. Node 24 runs the `.mts` scripts directly, but does not type-check them; `pnpm run typecheck` checks both programs. Treat external data as `unknown` and narrow it with runtime checks. Avoid explicit `any`, blanket type assertions, and error suppressions. Prefer straightforward domain types.
 
-源码和脚本统一使用严格 TypeScript 7.0.2。Node 24 直接执行 `.mts` 脚本，但不会检查类型；`npm run typecheck` 同时检查源码和脚本。外部数据先按 `unknown` 处理，再通过运行时检查收窄。避免显式 `any`、宽泛类型断言和错误屏蔽，优先使用直观的业务类型。
+源码和脚本统一使用严格 TypeScript 7.0.2。Node 24 直接执行 `.mts` 脚本，但不会检查类型；`pnpm run typecheck` 同时检查源码和脚本。外部数据先按 `unknown` 处理，再通过运行时检查收窄。避免显式 `any`、宽泛类型断言和错误屏蔽，优先使用直观的业务类型。
 
 TypeScript 7.0 has no compiler API. Our build uses the `tsc` CLI. Before introducing compiler-API consumers (such as typescript-eslint or framework-specific language tooling), verify their TS7 support; do not silently add a second compiler. See the [official TypeScript 7.0 announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/).
 

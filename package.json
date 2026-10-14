@@ -23,7 +23,7 @@
   "engines": {
     "node": ">=24 <25"
   },
-  "packageManager": "npm@11.9.0",
+  "packageManager": "pnpm@12.11.2",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
   "exports": {
@@ -72,16 +72,21 @@
   },
   "scripts": {
     "clean": "node scripts/clean.mts",
-    "build": "node scripts/prepare-types.mts && npm run clean && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/build-client.mts",
+    "build": "node scripts/prepare-types.mts && pnpm run clean && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/build-client.mts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.scripts.json && tsc -p tsconfig.tests.json && tsc -p tsconfig.tests-client.json",
     "smoke": "node scripts/artifact-smoke.mts",
     "pack:check": "node scripts/pack-smoke.mts",
-    "verify": "npm run build && npm run typecheck && npm run test:headless && npm run test:client && publint && npm run smoke",
-    "prepare": "npm run build",
-    "prepack": "npm run build",
-    "prepublishOnly": "npm run verify",
-    "test:headless": "node --test tests/headless.mts",
-    "test:client": "node --test tests/client.mts"
+    "verify": "pnpm run build && pnpm run typecheck && pnpm run test:fast && pnpm run test:integration:contract && publint && pnpm run smoke",
+    "prepare": "pnpm run build",
+    "prepack": "pnpm run build",
+    "prepublishOnly": "pnpm run verify",
+    "test": "pnpm run test:fast",
+    "test:fast": "pnpm run test:unit && pnpm run test:component && pnpm run test:integration:mock",
+    "test:unit": "node --test tests/unit/*.mts",
+    "test:component": "node --test tests/client.mts",
+    "test:integration:mock": "node --test tests/integration/*.mts",
+    "test:integration:contract": "node --test tests/headless.mts",
+    "test:e2e": "node --test tests/e2e/*.mts"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.5-alpha.1",
@@ -129,6 +134,7 @@
     "@deepseek-ai/dsh-plugin-manager": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-session": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-session-projection": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-session-query-sqlite": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-session-reference": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-shell-env": "0.2.1-alpha.2",

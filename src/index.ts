@@ -5,6 +5,7 @@ export const name = 'dsh-devwork'
 export const inject = ['agents', 'agentTeams', 'tools', 'systemPrompt', 'workspaceChanges', 'workingDirectory']
 export { Devwork }
 export type * from './types.js'
+export * from './task-center/index.js'
 
 /**
  * Host feature whose dependencies and resources are owned by Cordis.

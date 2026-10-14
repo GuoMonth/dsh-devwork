@@ -2,32 +2,33 @@
 
 [English](README.md) | 中文
 
-基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的桌面开发工作台。和一个主控 AI 沟通，让开发任务并行推进，在同一个地方查看和审查成果。
+基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的任务中心桌面开发工作台。以任务定义工作，通过 Session 树跟踪推进，在同一个地方查看和审查产出。
 
-**当前状态：本地 headless POC。** 已用脚本模型和真实 DSH 服务验证团队开发 → 审查 → 验收 → 定位反馈 → 修改的闭环；尚未证明真实模型自主协作或桌面渲染质量。目前没有发布 npm 版本。
+**当前状态：任务中心重构，基础层已实现。** [领域模型](docs/task-center.zh.md) 已提供任务与 Session 关系、独立生命周期状态、任务树投影和本地事件日志。执行引擎、桌面任务面板和 PR/MR 交付流程正按[需求 #1](https://github.com/GuoMonth/dsh-devwork/issues/1) 重建。旧 headless POC 暂时保留接线用于回归验证；其脚本模型测试不证明自主规划或桌面渲染。目前没有发布 npm 版本。
 
 ## 产品方向
 
 - 保留 DSH 的会话、工具、权限和插件使用习惯。
-- 由主控 AI 协调任务、汇总成果并呈现需要人决策的问题。
+- 每个任务只有一个主 Session；任务分解对应 Session 树，重试在同一 Session 下增加 Attempt。
+- 跟踪推进、阻塞原因、验收与持久化 Artifact；合并 PR/MR 需要用户授权。
 - 将代码审查和一次性反馈融入同一条开发路径。
 - 吸收 Orca 的开发者体验，在 DSH 中独立实现；不依赖 Orca 的代码或运行时。
 
-第一阶段聚焦本地桌面开发。远程执行、手机客户端、邮件和崩溃自动恢复暂缓。
+第一阶段聚焦本地桌面开发，仅一个活跃执行者。产品内多 Agent 协作、远程执行、手机客户端、邮件和崩溃自动恢复暂缓。此次重构不承诺旧 Round API 或数据兼容。
 
 参见[headless POC 评估](docs/headless-poc.zh.md)，包含实现、生命周期发现、验证结果与阻塞点。复用官方任务和成员，以当前代码的验收证据约束交付，把多个 diff 评论作为一条消息交回同一个 Leader。临时任务 worktree 已支持[提交 Leader 摘要后的交付清理](docs/task-delivery.zh.md)。UI 目前提供可编辑的启动请求，成果和反馈界面仍待实现。另见早期的[第一阶段评估](docs/phase-one.zh.md)。
 
 ## 开发与试装
 
-兼容基线：DSH **0.2.1-alpha.2**，Cordis **4.0.5-alpha.1**。仅支持 **Node.js 24.x**，不锁定小版本和补丁版本；CI 与发布流程统一使用 Node 24。源码和开发脚本均采用**严格 TypeScript 7.0.2**，并启用索引访问与可选属性的额外检查。
+兼容基线：DSH **0.2.1-alpha.2**，Cordis **4.0.5-alpha.1**。仅支持 **Node.js 24.x**，使用 **pnpm 12.11.2**，不锁定 Node 小版本和补丁版本；CI 与发布流程统一使用 Node 24。源码和开发脚本均采用**严格 TypeScript 7.0.2**，并启用索引访问与可选属性的额外检查。
 
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git
 cd dsh-devwork
-npm ci
-npm run verify
-npm run pack:check
-npm pack
+pnpm install --frozen-lockfile
+pnpm run verify
+pnpm run pack:check
+pnpm pack
 ```
 
 在 DSH 桌面端「插件」页面，以本地包目录试装，开启 Devwork 和官方显式启用的 Agent Teams bundle。Host 还需要官方 tools、Bash provider、system prompt、workspace-changes 和 working-directory；依赖缺失时 Devwork 保持 pending。输入区入口只插入可编辑请求，不自动发送。也可以在已安装 DSH CLI 的环境里，从仓库的上级目录验证安装：
