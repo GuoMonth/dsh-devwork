@@ -11,6 +11,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
 import { apply, inject, StartAction } from '../lib/client/index.js'
 import type { StartProps } from '../lib/client/index.js'
+import { SessionTaskView, TaskPanel } from '../lib/client/task-panel.js'
+import { MemoryTaskLogStore, TaskRepository } from '../lib/task-center/index.js'
+import type { TaskProjection } from '../lib/task-center/index.js'
 import { record } from '../scripts/data.mts'
 
 const require = createRequire(import.meta.url)
@@ -64,18 +67,75 @@ test('Client factory: official slot registers lazily and disposes with its decla
     assert.deepEqual([...loaded.inject], [...inject])
     const feature = await ctx.plugin({ inject: loaded.inject, apply: loaded.apply })
     assert.equal(ctx.slots.entries('conversation.input.left').length, 0)
-    const declarationFixture = (props: PropsRenderSlots<'conversation.input.left'>) => { void props.renderSlot; return null }
-    const declare = () => ctx.slots.register({ name: 'root', inject: () => ({}), children: { 'conversation.input.left': { kind: 'list', scope: 'session' } } }, declarationFixture)
+    const declarationFixture = (props: PropsRenderSlots<'conversation.input.left' | 'conversation.view'>) => { void props.renderSlot; return null }
+    const declare = () => ctx.slots.register({ name: 'root', inject: () => ({}), children: { 'conversation.input.left': { kind: 'list', scope: 'session' }, 'conversation.view': { kind: 'list', scope: 'session' } } }, declarationFixture)
     const collapse = declare()
     assert.equal(ctx.slots.entries('conversation.input.left').length, 1)
+    assert.equal(ctx.slots.entries('conversation.view').length, 1)
     collapse()
     assert.equal(ctx.slots.entries('conversation.input.left').length, 0)
+    assert.equal(ctx.slots.entries('conversation.view').length, 0)
     const redeclare = declare()
     assert.equal(ctx.slots.entries('conversation.input.left').length, 1)
+    assert.equal(ctx.slots.entries('conversation.view').length, 1)
     await feature.dispose()
     assert.equal(ctx.slots.entries('conversation.input.left').length, 0)
+    assert.equal(ctx.slots.entries('conversation.view').length, 0)
     redeclare()
   } finally { await ctx.fiber.dispose() }
+})
+
+const projection = (status: TaskProjection['tasks'][number]['status'] = 'active'): TaskProjection => ({
+  revision: 8,
+  tasks: [
+    { id: 'root', parentId: null, title: 'Ship panel', goal: 'Ship panel', scope: ['client'], acceptance: ['renders tree'], dependencyIds: [], status, blockedReason: status === 'blocked' ? 'waiting for host source' : null },
+    { id: 'child', parentId: 'root', title: 'Write view', goal: 'Write view', scope: ['client'], acceptance: ['has artifact'], dependencyIds: [], status: 'completed', blockedReason: null },
+  ],
+  sessions: [{ id: 'session-root', taskId: 'root', externalSessionId: null, status: 'waiting' }, { id: 'session-child', taskId: 'child', externalSessionId: null, status: 'succeeded' }],
+  attempts: [{ id: 'attempt-root', sessionId: 'session-root', agentId: 'writer', number: 1, status: 'waiting' }],
+  artifacts: [{ id: 'artifact', taskId: 'root', attemptId: 'attempt-root', kind: 'commit', uri: 'commit:abc', status: 'ready' }],
+  integrations: [{ id: 'pr', taskId: 'root', artifactId: 'artifact', provider: 'github', url: 'https://github.com/example/repo/pull/1', status: 'open' }],
+  leases: [],
+})
+
+test('Task panel renders loading, error, and empty states', () => {
+  assert.match(renderToStaticMarkup(createElement(TaskPanel, { data: { kind: 'loading' } })), /Loading tasks/)
+  assert.match(renderToStaticMarkup(createElement(TaskPanel, { data: { kind: 'error', message: 'disk unavailable' } })), /disk unavailable/)
+  assert.match(renderToStaticMarkup(createElement(TaskPanel, { projection: { revision: 0, tasks: [], sessions: [], attempts: [], artifacts: [], integrations: [], leases: [] } })), /No tasks yet/)
+})
+
+test('Task panel and Session view consume one projection tree and show blocked/status/artifact evidence', () => {
+  const view = projection('blocked')
+  const panelMarkup = renderToStaticMarkup(createElement(TaskPanel, { projection: view, expandedIds: new Set(['root']) }))
+  const sessionMarkup = renderToStaticMarkup(createElement(SessionTaskView, { projection: view, taskId: 'root', expandedIds: new Set(['root']) }))
+  assert.match(panelMarkup, /Ship panel/)
+  assert.match(panelMarkup, /waiting for host source/)
+  assert.match(panelMarkup, /Artifacts: commit · ready · commit:abc/)
+  assert.match(panelMarkup, /PR\/MR: github · open/)
+  assert.match(sessionMarkup, /Ship panel/)
+  assert.match(sessionMarkup, /Write view/)
+  assert.match(sessionMarkup, /blocked/)
+  const updatedMarkup = renderToStaticMarkup(createElement(TaskPanel, { projection: projection('completed') }))
+  assert.match(updatedMarkup, /Ship panel · completed/)
+})
+
+const createTask = (id: string, parentId: string | null = null) => ({ type: 'task.create', id, parentId, title: id, goal: id, scope: ['client'], acceptance: ['record evidence'], dependencyIds: [] })
+
+test('mock TaskLogStore projection is identical in the panel and Session view', async () => {
+  const store = new MemoryTaskLogStore()
+  const repository = new TaskRepository(store)
+  await repository.dispatch(createTask('root'))
+  await repository.dispatch(createTask('child', 'root'))
+  await repository.dispatch({ type: 'session.create', id: 'session-root', taskId: 'root', externalSessionId: null })
+  await repository.dispatch({ type: 'session.create', id: 'session-child', taskId: 'child', externalSessionId: null })
+  const view = await repository.snapshot()
+  const panelMarkup = renderToStaticMarkup(createElement(TaskPanel, { projection: view, expandedIds: new Set(['root']) }))
+  const sessionMarkup = renderToStaticMarkup(createElement(SessionTaskView, { projection: view, taskId: 'root', expandedIds: new Set(['root']) }))
+  for (const text of ['root', 'child', 'pending', 'Session: session-root']) {
+    const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    assert.match(panelMarkup, new RegExp(escaped))
+    assert.match(sessionMarkup, new RegExp(escaped))
+  }
 })
 
 test('UI is an editable explicit request, preserves insertion revision and never submits', async () => {

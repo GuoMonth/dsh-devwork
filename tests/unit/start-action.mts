@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { StartAction } from '../../src/client/index.ts'
-import type { StartProps } from '../../src/client/index.ts'
+import { StartAction } from '../../lib/client/index.js'
+import type { StartProps } from '../../lib/client/index.js'
 
 test('building the start request button is pure and exposes an explicit button action', () => {
   const unexpected = (): never => { throw new Error('Rendering must not edit a draft or submit a request') }
