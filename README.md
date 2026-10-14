@@ -24,10 +24,10 @@ Baseline: DSH **0.2.1-alpha.2**, Cordis **4.0.5-alpha.1**. Use **Node.js 24.x on
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git
 cd dsh-devwork
-npm ci
-npm run verify
-npm run pack:check
-npm pack
+pnpm install --frozen-lockfile
+pnpm run verify
+pnpm run pack:check
+pnpm pack
 ```
 
 In the DSH desktop Plugins page, use the local package directory as an installation source. Enable Devwork and the official opt-in Agent Teams bundle. The Host also needs official tools, a Bash provider, system prompt, workspace-changes, and working-directory. Missing services leave Devwork pending. The input action inserts an editable request and never submits it automatically. For CLI validation with an installed DSH CLI, from the directory above the checkout:
@@ -51,7 +51,7 @@ Official alpha.2 upgrade findings: [assessment](docs/upstream-alpha-assessment.m
 
 Package: `@guosheng_047/dsh-devwork`. It is a DSH **bundle** with `dsh.bundle.patch`, not a profile. Shared Host APIs are peers; built JavaScript, declarations, patch, icon, and locales are included in the npm tarball.
 
-See [release instructions](docs/releasing.md) and [contributing](CONTRIBUTING.md). GitHub alpha tags package a prerelease tarball; npm publishing is a separate, explicit maintainer action.
+See [release instructions](docs/releasing.md) and [contributing](CONTRIBUTING.md). GitHub alpha tags package a prerelease tarball; pnpm publishing is a separate, explicit maintainer action.
 
 ## References
 

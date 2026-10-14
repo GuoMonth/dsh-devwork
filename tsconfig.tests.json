@@ -7,5 +7,5 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["tests/headless.mts", "tests/runtime.mts"]
+  "include": ["tests/headless.mts", "tests/runtime.mts", "tests/unit/review.mts", "tests/integration/**/*.mts", "tests/e2e/**/*.mts"]
 }

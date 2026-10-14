@@ -23,6 +23,27 @@ import { parseJson, record, string } from '../scripts/data.mts'
 const PENDING: FiberState = 0
 const ACTIVE: FiberState = 2
 
+test('explicit start request opens a round through official tools and requires passing acceptance', { timeout: 30_000 }, async () => {
+  const r = await boot()
+  try {
+    const writing = await task(r)
+    await complete(r, writing.id)
+    r.model.script(r.lead, [
+      tool('devwork_open', { goal: 'Correct addition', taskIds: [writing.id], checks: [CHECK] }),
+      tool('devwork_verify', {}),
+      text('The declared acceptance check failed; the task is not ready for review.'),
+    ])
+    prompt(r.lead, 'Please use Agent Teams for a Devwork local development round. Goal: correct addition; call devwork_open and devwork_verify.')
+    await r.lead.whenIdle()
+    const brief = await r.ctx.devwork.brief(r.lead, SIGNAL)
+    assert.equal(brief.goal, 'Correct addition')
+    assert.equal(brief.completed, 1)
+    assert.equal(brief.checks[0]?.status, 'failed')
+    assert.equal(brief.stage, 'needs-attention')
+    assert.ok(r.lead.session.snapshotEvents().some(event => event.type === 'tool/result'))
+  } finally { await r.close() }
+})
+
 test('owned worktree: real Team edits, committed Leader handoff, verified integration and non-forced cleanup', { timeout: 60_000 }, async () => {
   const r = await boot()
   let checkout: string | undefined

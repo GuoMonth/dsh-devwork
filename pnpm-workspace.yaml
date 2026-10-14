@@ -1,0 +1,10 @@
+engineStrict: true
+# Test commands must never install dependencies or contact the registry implicitly.
+verifyDepsBeforeRun: error
+# Keep the development-only declaration correction local to this checkout.
+packageImportMethod: copy
+allowBuilds:
+  esbuild: true
+  '@deepseek-ai/dsh-subprocess-local': true
+  koffi: true
+  node-pty: true

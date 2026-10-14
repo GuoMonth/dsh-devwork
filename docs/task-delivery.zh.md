@@ -46,8 +46,8 @@ alpha.2 官方 working-directory 服务可改变有效 cwd，但 Devwork 不自�
 `tests/headless.mts` 使用确定性模型驱动真实 Team/Bash/Git，证明源 checkout 修改、Leader 整合、摘要提交、主工作区验收及清理的完整路径，并覆盖 stale handoff、未整合、缺摘要、dirty、官方拒绝、并发/重复调用和用户已有 dirty 文件保护。真实模型的路径纪律、摘要质量与原生桌面仍需验收。
 
 ```sh
-npm ci
-npm run verify
-npm run pack:check
-npm pack --dry-run
+pnpm install --frozen-lockfile
+pnpm run verify
+pnpm run pack:check
+pnpm pack --dry-run
 ```

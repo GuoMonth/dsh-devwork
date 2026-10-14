@@ -24,10 +24,10 @@
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git
 cd dsh-devwork
-npm ci
-npm run verify
-npm run pack:check
-npm pack
+pnpm install --frozen-lockfile
+pnpm run verify
+pnpm run pack:check
+pnpm pack
 ```
 
 在 DSH 桌面端「插件」页面，以本地包目录试装，开启 Devwork 和官方显式启用的 Agent Teams bundle。Host 还需要官方 tools、Bash provider、system prompt、workspace-changes 和 working-directory；依赖缺失时 Devwork 保持 pending。输入区入口只插入可编辑请求，不自动发送。也可以在已安装 DSH CLI 的环境里，从仓库的上级目录验证安装：

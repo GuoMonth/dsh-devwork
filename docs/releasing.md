@@ -24,10 +24,10 @@ The icon/locale convention follows the official Agent Teams bundle. English/Chin
 ## Validate
 
 ```sh
-npm ci
-npm run verify
-npm run pack:check
-npm pack --dry-run
+pnpm install --frozen-lockfile
+pnpm run verify
+pnpm run pack:check
+pnpm pack --dry-run
 ```
 
 These validate strict Host/Client/script/test types, headless behavior and Client boundary scenarios, exports, bundle metadata, and installing/importing the prebuilt tarball in an independent consumer. The Client uses the official closure-factory loader and public conversation slot. The exact alpha.2 declaration correction is development-only, excluded from the package; see the [POC assessment](headless-poc.md). They do not prove a desktop interaction or model task works. Before an actual release, install the tarball into the target DSH desktop, enable/disable the plugin, and verify every advertised capability. Recheck compatibility whenever the DSH baseline changes.
@@ -47,8 +47,8 @@ The alpha workflow rejects a mismatched version, rechecks the package, and creat
 Use the existing maintainer scope `@guosheng_047`. Confirm npm identity, scope publishing rights, and first-publication package availability before publishing. Authenticate through your normal npm method; no token belongs in the repository.
 
 ```sh
-npm whoami
-npm publish --access public --tag alpha
+pnpm whoami
+pnpm publish --access public --tag alpha
 ```
 
 `prepublishOnly` verifies the package and `prepack` builds it. Never promote an alpha POC to `latest`. GitHub Actions trusted publishing is not configured by this scaffold; it requires npm-side setup and a deliberate release policy.

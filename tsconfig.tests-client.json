@@ -8,5 +8,5 @@
     "erasableSyntaxOnly": true,
     "types": ["node", "react", "react-dom"]
   },
-  "include": ["tests/client.mts"]
+  "include": ["tests/client.mts", "tests/unit/start-action.mts"]
 }

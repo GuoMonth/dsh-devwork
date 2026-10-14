@@ -67,10 +67,10 @@ Each capture requires two matching bounded reads with no automatic retry. Observ
 ## Reproduce and evidence boundary
 
 ```sh
-npm ci
-npm run verify
-npm run pack:check
-npm pack --dry-run
+pnpm install --frozen-lockfile
+pnpm run verify
+pnpm run pack:check
+pnpm pack --dry-run
 ```
 
 Earlier headless runs established the following baseline behavior. The official-binding cases 8–9 below are historical evidence, superseded by the independent cumulative review contract above; they are not current acceptance claims. Use a fresh run of the commands above to validate the current implementation.
