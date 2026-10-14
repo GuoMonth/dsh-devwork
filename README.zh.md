@@ -4,7 +4,7 @@
 
 基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的任务中心桌面开发工作台。以任务定义工作，通过 Session 树跟踪推进，在同一个地方查看和审查产出。
 
-**当前状态：任务中心重构，领域与可注入执行基础层已实现。** [领域模型](docs/task-center.zh.md) 已提供任务与 Session 关系、独立生命周期状态、任务树投影、本地事件日志、确定性的嵌套任务接入和可 mock 的单执行者执行。执行层还不是 DSH Host 适配器。桌面任务面板和 PR/MR 交付流程仍按[需求 #1](https://github.com/GuoMonth/dsh-devwork/issues/1) 重建。旧 headless POC 暂时保留接线用于回归验证；其脚本模型测试不证明自主规划或桌面渲染。目前没有发布 npm 版本。
+**当前状态：任务中心 Host 桥接已实现并有 mock 覆盖；原生桌面验收仍待完成。** [领域模型](docs/task-center.zh.md) 已提供任务与 Session 关系、独立生命周期状态、任务树投影、本地事件日志、确定性的嵌套任务接入和可 mock 的单执行者执行。`TaskPanelHost` 现在通过共享持久化仓库、执行引擎和交付服务注入按 Session 绑定的公开 source。没有 Provider 配置时明确显示 unavailable，mock 测试不冒充真实桌面或 Provider 验收。旧 headless POC 暂时保留接线用于回归验证；其脚本模型测试不证明自主规划或桌面渲染。目前没有发布 npm 版本。
 
 ## 产品方向
 
@@ -40,7 +40,7 @@ dsh --profile devwork-demo --dump-config
 
 输出应包含 Devwork 的 bundle 层和 `guomonth-devwork` 插件行。这个 CLI profile 仅用于验证安装，不是独立桌面应用。
 
-测试无需浏览器，覆盖 Host 行为及 Client 注册、文本插入。真实模型与原生桌面验收仍待完成。DSH alpha.2 仍保留公开声明组合类型缺陷，精确、仅开发期的修正在 [POC 评估](docs/headless-poc.zh.md) 中说明。
+测试无需浏览器，覆盖 Host 桥接、mock 交付/执行及 Client 注册、文本插入。真实模型、权限界面、Provider 和原生桌面验收仍待完成。DSH alpha.2 仍保留公开声明组合类型缺陷，精确、仅开发期的修正在 [POC 评估](docs/headless-poc.zh.md) 中说明。
 
 Host 审查在异步 `open` 完成时取得自有、有界的实际内容基线；开始派发开发工作前必须等待它完成。审查跨 turn 比较起点与当前 checkout，包含已暂存/已提交的改动和删除，排除未再变化的已有 dirty/未跟踪内容。按文件延迟调用的 `reviewDiff` 提供粗粒度文本比较或文件元数据；反馈支持当前侧文本行，以及删除、二进制、可执行位变化和符号链接的整文件评论。
 

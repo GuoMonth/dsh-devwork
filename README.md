@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 A task-centered desktop development workspace built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Define work as tasks, follow their Session tree, and review outputs in one place.
 
-**Status: task-center rewrite, domain and injectable execution foundation implemented.** The [domain model](docs/task-center.md) provides task/Session relationships, independent lifecycle states, a task-tree projection, a local event log, deterministic nested task intake, and mockable single-executor execution. The execution layer is not yet a DSH Host adapter. The desktop task panel and PR/MR delivery flow are being rebuilt under [request #1](https://github.com/GuoMonth/dsh-devwork/issues/1). The old headless POC remains temporarily wired for regression coverage; its scripted-model tests do not prove autonomous planning or desktop rendering. No npm release has been published.
+**Status: task-center Host bridge implemented with mock coverage; native desktop acceptance remains open.** The [domain model](docs/task-center.md) provides task/Session relationships, independent lifecycle states, a task-tree projection, a local event log, deterministic nested task intake, and mockable single-executor execution. `TaskPanelHost` now injects a Session-scoped public source backed by the shared durable repository, execution engine and delivery service. No provider configuration means an explicit unavailable state, and mock tests do not claim real desktop or provider acceptance. The old headless POC remains temporarily wired for regression coverage; its scripted-model tests do not prove autonomous planning or desktop rendering. No npm release has been published.
 
 ## Direction
 
@@ -40,7 +40,7 @@ dsh --profile devwork-demo --dump-config
 
 The output should include the Devwork bundle layer and the `guomonth-devwork` row. This CLI profile is an installation check, not a separate desktop application.
 
-The test suite checks Host behavior and Client registration/insertion without a browser. The real-model and native desktop acceptance checks remain open. DSH alpha.2 retains a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
+The test suite checks the Host bridge, mock delivery/execution and Client registration/insertion without a browser. The real-model, permission UI, provider and native desktop acceptance checks remain open. DSH alpha.2 retains a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
 
 Host review captures its own bounded, actual-content baseline when the asynchronous `open` completes. Await it before dispatching coding work. Review compares that baseline with the current checkout across turns, including staged/committed changes and deletions while excluding unchanged preexisting dirty/untracked content. A lazy per-file `reviewDiff` exposes coarse text comparisons or file metadata; feedback supports current-side text lines and whole-file comments for deletions, binary files, executable-mode changes and symlinks.
 

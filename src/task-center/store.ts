@@ -23,6 +23,13 @@ export class MemoryTaskLogStore implements TaskLogStore {
 
 export class TaskRepository {
   private queue: Promise<void> = Promise.resolve()
+  private readonly listeners = new Set<() => void>()
+
+  /** Observe committed events without creating a second projection store. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
 
   constructor(private readonly store: TaskLogStore, private readonly now: () => Date = () => new Date()) {}
 
@@ -45,6 +52,9 @@ export class TaskRepository {
     const event = { sequence: previous.revision + 1, occurredAt: this.now().toISOString(), command } as const
     const next = applyEvent(previous, event)
     await this.store.save({ version: 1, events: [...log.events, event] }, previous.revision)
+    for (const listener of [...this.listeners]) {
+      try { listener() } catch { /* Observers cannot undo a committed event. */ }
+    }
     return next
   }
 }

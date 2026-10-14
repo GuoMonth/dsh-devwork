@@ -10,4 +10,10 @@ export * from './task-center/index.js'
 /**
  * Host feature whose dependencies and resources are owned by Cordis.
  */
-export function apply(ctx: Context): void { ctx.plugin(Devwork) }
+import { TaskPanelHost } from './task-center/host.js'
+import type { TaskPanelHostOptions } from './task-center/host.js'
+
+export function apply(ctx: Context, options?: TaskPanelHostOptions): void {
+  ctx.plugin(Devwork)
+  ctx.plugin(TaskPanelHost, options)
+}

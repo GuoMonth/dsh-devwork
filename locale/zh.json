@@ -38,6 +38,7 @@
     "noReason": "未记录原因。",
     "attempt": "尝试",
     "children": "个子任务",
-    "noTask": "此 Session 未关联任务。"
+    "noTask": "此 Session 未关联任务。",
+    "authorize": "授权合并"
   }
 }

@@ -12,6 +12,16 @@
 
 工作区清理由后续交付服务负责：任务的 Artifact 与 PR/MR 引用先持久化，远端状态和验收证据确认后才允许释放租约。状态未知、未提交、未推送、未整合或清理失败时必须保留现场。当前领域层只记录租约转移，不执行 Git、Provider 或文件清理。创建失败后可释放预留租约，但调用方必须确认没有遗留自有 checkout。
 
-领域与存储基础已经完成，任务执行引擎（#16）现在提供确定性的任务接入和可 mock 的执行。桌面面板（#17）和 PR/MR 交付（#18）仍是独立工作。测试覆盖状态转移、任务树与 Session 关系、执行结果、并发写入、重启读取、损坏数据和存储失败，不证明 AI 自主规划或桌面渲染。
+领域与存储基础已经完成，任务执行引擎（#16）现在提供确定性的任务接入和可 mock 的执行。Host 桥接已将执行引擎、面板投影和 PR/MR 交付（#18）接通；测试覆盖状态转移、任务树与 Session 关系、执行结果、并发写入、重启读取、损坏数据和存储失败。mock 桥接测试不证明 AI 自主规划或桌面渲染。
 
 执行层接收经过严格校验的嵌套任务定义，并以稳定顺序注册父任务和子任务。每个任务通过注入的 Session Provider 获得一个确定性的主 Session；注入的 Agent Provider 一次只执行一个任务，并将明确结果映射为可持久化的继续、暂停、阻塞、失败、取消和重试命令。重试保留原 Session，只创建下一个 Attempt。每次执行都有可取消信号，过期的 Provider 结果不会写回；Session 接入使用稳定幂等键。这里是可注入的执行引擎边界，还不是 DSH Host 适配器；Provider 可以使用 mock，执行层不需要真实模型、桌面服务或旧 Round API。任务树的后代计数仍是进度证据，不替代完成状态。
+
+## Host/Client 任务面板桥接
+
+`TaskPanelHost` 在 Host 生命周期内统一持有一份 `FileTaskLogStore`/`TaskRepository`、`TaskExecutionEngine` 和 `TaskDeliveryService`，并注入公开的 `taskPanelSource`。`forSession(sessionId)` 将边界绑定到当前 Session，面板和 Session 视图仍读取同一份 Host 投影，Client 不创建第二套任务事实状态。Host 卸载和取消订阅会释放监听器；新的 Host 可以重新打开事件日志，但不会自动恢复 Agent 执行。
+
+桥接要求显式提供 Session/Agent Provider，可选配置交付 Provider。缺少仓库或 Provider 时，source 明确为 `unavailable`，不会静默构造 mock Provider。Provider 刷新错误由交付服务保留既有 Artifact/PR 状态并标记同步不确定。合并必须经过 `authorizeMerge` 产生的带品牌授权对象，Agent 或 Client 的布尔值不能授权；工作区清理仍受交付、验收、所有权和干净交付条件约束，因此不确定的工作和持久化 Artifact 会继续可见。
+
+创建任务必须显式配置 planner 或 `createInput` 适配器；桥接不会从任意 Client 状态猜测任务。
+
+当前 Host 测试使用 mock Provider 和内存日志，覆盖父子任务创建、统一投影、打开/继续/查看、授权交接、source 拆卸与未配置状态。它们不证明自主规划、真实 Provider 写入、权限界面或原生桌面渲染；这些仍需真实桌面验收。

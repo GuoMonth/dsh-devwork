@@ -6,13 +6,27 @@ import type { TaskTreeNode } from '../task-center/tree.js'
 import type { IntegrationRef, TaskArtifact, TaskProjection, TaskStatus } from '../task-center/types.js'
 
 /** A point-in-time panel input. The panel never owns or mutates this state. */
-export type TaskPanelData =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'unavailable'; readonly message?: string | undefined }
-  | { readonly kind: 'error'; readonly message: string }
-  | { readonly kind: 'ready'; readonly projection: TaskProjection }
+export { unavailableTaskPanelData } from '../task-center/panel.js'
+export type { TaskPanelData, TaskPanelViewContext } from '../task-center/panel.js'
+import { unavailableTaskPanelData } from '../task-center/panel.js'
+import type { TaskPanelData } from '../task-center/panel.js'
 
-export type TaskPanelLocaleKey = 'panel' | 'create' | 'loading' | 'unavailable' | 'empty' | 'error' | 'session' | 'status' | 'blocked' | 'failed' | 'progress' | 'progressNone' | 'progressCompleted' | 'progressBlocked' | 'acceptance' | 'noAcceptance' | 'acceptancePending' | 'checks' | 'noChecks' | 'cleanup' | 'noCleanup' | 'artifacts' | 'noArtifacts' | 'pullRequest' | 'noPullRequest' | 'view' | 'open' | 'continue' | 'expand' | 'collapse' | 'noSession' | 'noReason' | 'attempt' | 'children' | 'noTask'
+/** Client-specialized view of the shared Host bridge; owner props stay public. */
+export interface TaskPanelSource {
+  readonly forSession?: ((sessionId: string) => TaskPanelSource) | undefined
+  getSnapshot(view: ConvViewProps): TaskPanelData
+  subscribe(view: ConvViewProps, listener: () => void): () => void
+  readonly actions: {
+    create?(view: ConvViewProps, input?: unknown): void | Promise<void>
+    open?(taskId: string, sessionId: string | null, view: ConvViewProps): void | Promise<void>
+    continue?(taskId: string, sessionId: string | null, view: ConvViewProps): void | Promise<void>
+    view?(target: TaskArtifact | IntegrationRef, view: ConvViewProps): void | Promise<void>
+    authorize?(integrationId: string, view: ConvViewProps): void | Promise<void>
+    merge?(integrationId: string, authorization: unknown, view: ConvViewProps): void | Promise<void>
+  }
+}
+
+export type TaskPanelLocaleKey = 'panel' | 'create' | 'loading' | 'unavailable' | 'empty' | 'error' | 'session' | 'status' | 'blocked' | 'failed' | 'progress' | 'progressNone' | 'progressCompleted' | 'progressBlocked' | 'acceptance' | 'noAcceptance' | 'acceptancePending' | 'checks' | 'noChecks' | 'cleanup' | 'noCleanup' | 'artifacts' | 'noArtifacts' | 'pullRequest' | 'noPullRequest' | 'view' | 'authorize' | 'open' | 'continue' | 'expand' | 'collapse' | 'noSession' | 'noReason' | 'attempt' | 'children' | 'noTask'
 export type TaskPanelTranslate = (key: TaskPanelLocaleKey) => string
 
 export interface TaskPanelLabels {
@@ -42,6 +56,7 @@ export interface TaskPanelLabels {
   readonly pullRequest: string
   readonly noPullRequest: string
   readonly view: string
+  readonly authorize: string
   readonly open: string
   readonly continue: string
   readonly expand: string
@@ -80,6 +95,7 @@ export const defaultTaskPanelLabels: TaskPanelLabels = {
   pullRequest: 'PR/MR',
   noPullRequest: 'No PR/MR recorded.',
   view: 'View',
+  authorize: 'Authorize merge',
   open: 'Open',
   continue: 'Continue',
   expand: 'Expand',
@@ -91,31 +107,17 @@ export const defaultTaskPanelLabels: TaskPanelLabels = {
   noTask: 'This Session has no linked task.',
 }
 
+
 export interface TaskPanelActions {
   readonly onCreate?: (() => void) | undefined
   readonly onOpen?: ((taskId: string, sessionId: string | null) => void) | undefined
   readonly onContinue?: ((taskId: string, sessionId: string | null) => void) | undefined
   readonly onView?: ((target: TaskArtifact | IntegrationRef) => void) | undefined
+  readonly onAuthorize?: ((integration: IntegrationRef) => void) | undefined
   readonly onToggle?: ((taskId: string, expanded: boolean) => void) | undefined
   readonly onExpand?: ((taskId: string) => void) | undefined
   readonly onCollapse?: ((taskId: string) => void) | undefined
 }
-
-/** Browser-side transport boundary. Host adapters own projection state. */
-export interface TaskPanelSource {
-  /** Scope the boundary to the current Session supplied by the public slot. */
-  readonly forSession?: ((sessionId: string) => TaskPanelSource) | undefined
-  readonly getSnapshot: (view: ConvViewProps) => TaskPanelData
-  readonly subscribe: (view: ConvViewProps, listener: () => void) => () => void
-  readonly actions: {
-    readonly create?: ((view: ConvViewProps) => void | Promise<void>) | undefined
-    readonly open?: ((taskId: string, sessionId: string | null, view: ConvViewProps) => void | Promise<void>) | undefined
-    readonly continue?: ((taskId: string, sessionId: string | null, view: ConvViewProps) => void | Promise<void>) | undefined
-    readonly view?: ((target: TaskArtifact | IntegrationRef, view: ConvViewProps) => void | Promise<void>) | undefined
-  }
-}
-
-export const unavailableTaskPanelData: TaskPanelData = { kind: 'unavailable' }
 
 /** Bind source commands once per scoped Conversation View occurrence. */
 export function bindTaskPanelActions(source: TaskPanelSource | undefined, view: ConvViewProps): TaskPanelActions {
@@ -124,6 +126,7 @@ export function bindTaskPanelActions(source: TaskPanelSource | undefined, view: 
     onOpen: source?.actions.open ? (taskId, sessionId) => { void source.actions.open?.(taskId, sessionId, view) } : undefined,
     onContinue: source?.actions.continue ? (taskId, sessionId) => { void source.actions.continue?.(taskId, sessionId, view) } : undefined,
     onView: source?.actions.view ? target => { void source.actions.view?.(target, view) } : undefined,
+    onAuthorize: source?.actions.authorize ? integration => { void source.actions.authorize?.(integration.id, view) } : undefined,
   }
 }
 
@@ -187,7 +190,7 @@ function labelsOf(labels: Partial<TaskPanelLabels> | undefined, t: TaskPanelTran
     noAcceptance: translated('noAcceptance'), acceptancePending: translated('acceptancePending'), checks: translated('checks'),
     noChecks: translated('noChecks'), cleanup: translated('cleanup'), noCleanup: translated('noCleanup'), artifacts: translated('artifacts'),
     noArtifacts: translated('noArtifacts'), pullRequest: translated('pullRequest'), noPullRequest: translated('noPullRequest'),
-    view: translated('view'), open: translated('open'), continue: translated('continue'), expand: translated('expand'),
+    view: translated('view'), authorize: translated('authorize'), open: translated('open'), continue: translated('continue'), expand: translated('expand'),
     collapse: translated('collapse'), noSession: translated('noSession'), noReason: translated('noReason'), attempt: translated('attempt'),
     children: translated('children'), noTask: translated('noTask'),
   }
@@ -238,17 +241,17 @@ function ActionButton({ label, onClick, disabled = false }: { readonly label: st
   return createElement('button', { type: 'button', disabled, onClick, style: { cursor: disabled ? 'default' : 'pointer', marginRight: 4 } }, label)
 }
 
-function ArtifactCard({ artifacts, integrations, labels, onView }: { readonly artifacts: readonly TaskArtifact[]; readonly integrations: readonly IntegrationRef[]; readonly labels: TaskPanelLabels; readonly onView?: ((target: TaskArtifact | IntegrationRef) => void) | undefined }): ReactNode {
+function ArtifactCard({ artifacts, integrations, labels, onView, onAuthorize }: { readonly artifacts: readonly TaskArtifact[]; readonly integrations: readonly IntegrationRef[]; readonly labels: TaskPanelLabels; readonly onView?: ((target: TaskArtifact | IntegrationRef) => void) | undefined; readonly onAuthorize?: ((integration: IntegrationRef) => void) | undefined }): ReactNode {
   if (artifacts.length === 0 && integrations.length === 0) return createElement('div', { 'data-testid': 'task-artifacts-empty' }, `${labels.artifacts}: ${labels.noArtifacts} · ${labels.pullRequest}: ${labels.noPullRequest}`)
   const rows: ReactNode[] = []
   for (const artifact of artifacts) rows.push(createElement('div', { key: artifact.id, 'data-testid': `task-artifact-${artifact.id}` }, `${labels.artifacts}: ${artifact.kind} · ${artifact.status} · ${artifact.uri}`, ActionButton({ label: labels.view, onClick: onView ? () => onView(artifact) : undefined, disabled: !onView })))
-  for (const integration of integrations) rows.push(createElement('div', { key: integration.id, 'data-testid': `task-integration-${integration.id}` }, `${labels.pullRequest}: ${integration.provider} · ${integration.status} · ${integration.url}`, ActionButton({ label: labels.view, onClick: onView ? () => onView(integration) : undefined, disabled: !onView })))
+  for (const integration of integrations) rows.push(createElement('div', { key: integration.id, 'data-testid': `task-integration-${integration.id}` }, `${labels.pullRequest}: ${integration.provider} · ${integration.status} · ${integration.url}`, ActionButton({ label: labels.view, onClick: onView ? () => onView(integration) : undefined, disabled: !onView }), ActionButton({ label: labels.authorize, onClick: onAuthorize ? () => onAuthorize(integration) : undefined, disabled: !onAuthorize })))
   return createElement('div', { 'data-testid': 'task-artifact-card', style: { display: 'grid', gap: 2 } }, ...rows)
 }
 
 type TaskNodeProps = Omit<TaskPanelTreeProps, 'nodes'> & { readonly treeNode: TaskTreeNode }
 
-function TaskNode({ treeNode, projection, labels, expandedIds, onOpen, onContinue, onView, onToggle, onExpand, onCollapse }: TaskNodeProps): ReactNode {
+function TaskNode({ treeNode, projection, labels, expandedIds, onOpen, onContinue, onView, onAuthorize, onToggle, onExpand, onCollapse }: TaskNodeProps): ReactNode {
   const node = treeNode
   const expanded = expandedIds?.has(node.task.id)
   const artifacts = projection.artifacts.filter(value => value.taskId === node.task.id)
@@ -260,7 +263,7 @@ function TaskNode({ treeNode, projection, labels, expandedIds, onOpen, onContinu
     else onCollapse?.(node.task.id)
   }
   const children: ReactNode = node.children.length > 0
-    ? createElement('div', { role: 'group', style: { marginLeft: 14, borderLeft: '1px solid currentColor', paddingLeft: 8 } }, ...node.children.map(child => createElement(TaskNode, { key: child.task.id, treeNode: child, projection, labels, expandedIds, onOpen, onContinue, onView, onToggle, onExpand, onCollapse })))
+    ? createElement('div', { role: 'group', style: { marginLeft: 14, borderLeft: '1px solid currentColor', paddingLeft: 8 } }, ...node.children.map(child => createElement(TaskNode, { key: child.task.id, treeNode: child, projection, labels, expandedIds, onOpen, onContinue, onView, onAuthorize, onToggle, onExpand, onCollapse })))
     : null
   const reason = node.task.status === 'blocked'
     ? ` · ${labels.blocked}: ${node.task.blockedReason ?? labels.noReason}`
@@ -283,7 +286,7 @@ function TaskNode({ treeNode, projection, labels, expandedIds, onOpen, onContinu
       node.task.acceptance.length > 0
         ? createElement('ul', { style: { margin: 0 } }, ...node.task.acceptance.map((criterion, index) => createElement('li', { key: `${node.task.id}-acceptance-${index}` }, `${criterion} · ${labels.acceptancePending}`)))
         : createElement('div', null, labels.noAcceptance),
-      createElement(ArtifactCard, { artifacts, integrations, labels, onView }),
+      createElement(ArtifactCard, { artifacts, integrations, labels, onView, onAuthorize }),
       createElement('div', null,
         ActionButton({ label: labels.open, onClick: onOpen ? () => onOpen(node.task.id, node.session?.id ?? null) : undefined, disabled: !onOpen }),
         ActionButton({ label: labels.continue, onClick: onContinue ? () => onContinue(node.task.id, node.session?.id ?? null) : undefined, disabled: !onContinue || node.task.status === 'completed' || node.task.status === 'cancelled' || node.task.status === 'review' }),
@@ -309,7 +312,7 @@ export function TaskPanel(props: TaskPanelProps) {
       ? createElement('div', { role: 'alert', 'data-testid': 'task-panel-error' }, `${labels.error}: ${data.message}`)
       : nodes.length === 0
         ? createElement('div', { 'data-testid': 'task-panel-empty' }, labels.empty)
-        : createElement(TaskPanelTree, { nodes, projection: data.projection, labels, expandedIds: props.expandedIds, onOpen: props.onOpen, onContinue: props.onContinue, onView: props.onView, onToggle: props.onToggle, onExpand: props.onExpand, onCollapse: props.onCollapse })
+        : createElement(TaskPanelTree, { nodes, projection: data.projection, labels, expandedIds: props.expandedIds, onOpen: props.onOpen, onContinue: props.onContinue, onView: props.onView, onAuthorize: props.onAuthorize, onToggle: props.onToggle, onExpand: props.onExpand, onCollapse: props.onCollapse })
   return createElement('section', { className: props.className, 'data-testid': 'task-panel', 'aria-label': labels.title, style: { display: 'grid', gap: 8, maxWidth: 640, font: 'inherit' } },
     createElement('header', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
       createElement('strong', null, labels.title),
@@ -328,7 +331,7 @@ export function SessionTaskView(props: SessionTaskViewProps) {
   if (!node) return createElement('section', { 'data-testid': 'session-task-empty' }, labels.noTask)
   return createElement('section', { 'data-testid': 'session-task-view', 'aria-label': node.task.title, style: { display: 'grid', gap: 6 } },
     createElement('div', null, `${node.task.title} · ${statusLabel(node.task.status)}`),
-    createElement(TaskPanelTree, { nodes: [node], projection: data.projection, labels, expandedIds: props.expandedIds, onOpen: props.onOpen, onContinue: props.onContinue, onView: props.onView, onToggle: props.onToggle, onExpand: props.onExpand, onCollapse: props.onCollapse }),
+    createElement(TaskPanelTree, { nodes: [node], projection: data.projection, labels, expandedIds: props.expandedIds, onOpen: props.onOpen, onContinue: props.onContinue, onView: props.onView, onAuthorize: props.onAuthorize, onToggle: props.onToggle, onExpand: props.onExpand, onCollapse: props.onCollapse }),
   )
 }
 

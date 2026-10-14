@@ -44,6 +44,21 @@ test('mock delivery creates idempotently, refreshes checks/reviews and preserves
   assert.match(uncertain.integrations[0]?.syncError ?? '', /mock network/)
 })
 
+test('unknown delivery provider marks persisted integration uncertain without erasing its last state', async () => {
+  const repository = new TaskRepository(new MemoryTaskLogStore(), () => at)
+  await repository.dispatch(createTask())
+  await repository.dispatch({ type: 'integration.create', id: 'integration', taskId: 'task', artifactId: null, provider: 'gitlab', url: 'https://gitlab.test/owner/repo/-/merge_requests/4', providerRef: '4', repository: 'owner/repo', ref: 'feature/task', targetRef: 'main', headSha: 'abc' })
+  await repository.dispatch({ type: 'integration.sync', integrationId: 'integration', status: 'approved', syncStatus: 'fresh', syncError: null, lastSyncedAt: at.toISOString() })
+  const service = new TaskDeliveryService(repository, [], { now: () => at })
+
+  const uncertain = await service.refresh('integration')
+  const integration = uncertain.integrations[0]
+  assert.equal(integration?.status, 'approved')
+  assert.equal(integration?.headSha, 'abc')
+  assert.equal(integration?.syncStatus, 'uncertain')
+  assert.match(integration?.syncError ?? '', /No delivery provider configured/)
+})
+
 test('merge requires trusted authorization and current head binding', async () => {
   const { service, provider, integration } = await setup()
   await assert.rejects(() => service.merge(integration.id, true), /trusted user authorization/)

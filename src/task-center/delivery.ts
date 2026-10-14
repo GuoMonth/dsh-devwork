@@ -157,9 +157,9 @@ export class TaskDeliveryService {
     const view = await this.repository.snapshot()
     const current = view.integrations.find(value => value.id === integrationId)
     if (current === undefined) throw new TaskDomainError(`Unknown integration: ${integrationId}`)
-    const provider = this.provider(current.provider)
-    const reference = providerRef(current)
     try {
+      const provider = this.provider(current.provider)
+      const reference = providerRef(current)
       const result = await provider.refresh(reference, signal)
       await this.repository.dispatch({ type: 'integration.sync', integrationId, status: result.status, headSha: result.headSha, checks: result.checks, review: result.review, syncStatus: 'fresh', syncError: null, lastSyncedAt: nowIso(this.now), mergedAt: result.mergedAt, closedAt: result.closedAt })
     } catch (error) {
@@ -173,9 +173,12 @@ export class TaskDeliveryService {
     const current = view.integrations.find(value => value.id === integrationId)
     if (current === undefined) throw new TaskDomainError(`Unknown integration: ${integrationId}`)
     if (authorization.provider !== current.provider || (authorization.providerRef !== undefined && authorization.providerRef !== current.providerRef) || authorization.repository !== current.repository || authorization.ref !== current.ref || authorization.headSha !== current.headSha) throw new TaskDomainError('Merge authorization does not match the integration head')
-    const provider = this.provider(current.provider)
+    let provider: DeliveryProvider
     let latest: ProviderIntegration
-    try { latest = await provider.refresh(providerRef(current), signal) } catch (error) {
+    try {
+      provider = this.provider(current.provider)
+      latest = await provider.refresh(providerRef(current), signal)
+    } catch (error) {
       await this.repository.dispatch({ type: 'integration.sync', integrationId, syncStatus: 'uncertain', syncError: errMessage(error), lastSyncedAt: current.lastSyncedAt })
       throw new TaskDomainError('Cannot merge while provider state is uncertain')
     }
