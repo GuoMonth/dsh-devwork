@@ -1,0 +1,15 @@
+# Task-center domain model
+
+The task is Devwork's durable first-class object. A Session is the task's execution surface, an Artifact records a task output, a PR/MR is an external integration output, and a workspace lease records a resource reservation. Lease metadata alone does not prove actual checkout ownership or authorize deletion.
+
+Each task definition carries a goal, scope, acceptance criteria, dependencies, and an optional parent. A pending task can await Session allocation; once bound, it has exactly one primary Session. Failure, continuation, and retry are recorded as Attempts under that Session; they do not create a second primary Session. The execution phase will enforce one active executor; multi-agent collaboration is out of scope.
+
+Task, Session, Artifact, PR/MR integration, and workspace lease states advance independently. An idle Session, stopped Agent, empty child list, or created PR does not mean delivery is complete. The domain prevents completion with unfinished children or a running/waiting Attempt, requires completed dependencies before execution, and rejects cycles across dependencies and child completion ordering. Execution and delivery services must additionally verify acceptance evidence before requesting completion.
+
+`TaskRepository` persists versioned events through an injected `TaskLogStore` and replays them into one projection. `taskTree` adds parent Session links and descendant progress counts without changing task status. The storage boundary accepts `unknown`; unknown fields, invalid sequences, illegal transitions, and cross-task Artifact/Integration links are rejected. Rejected commands do not append events.
+
+`FileTaskLogStore` writes a versioned JSON event log through an exclusive lock, synced temporary file, and atomic rename. The repository serializes its own commands; revision checks reject stale writes from other repositories. Reopening restores data, never Agent execution. Corrupt data is preserved. A lock left by an interrupted write requires explicit inspection; there is no automatic lock stealing, retry, migration, or crash recovery. `MemoryTaskLogStore` provides the same revision contract for tests.
+
+Workspace cleanup belongs to the upcoming delivery service: persist the Artifact and PR/MR reference first, then release the lease only after remote state and acceptance evidence are confirmed. Unknown, dirty, unpushed, unintegrated, or failed cleanup must preserve the workspace. This domain layer records lease transitions but performs no Git, provider, or filesystem cleanup operations. Reserved leases can be released after failed creation; the caller must confirm no owned checkout remains.
+
+Stage 1 implements this domain and storage foundation. The task engine (#16), desktop panel (#17), and PR/MR delivery (#18) remain separate work. Tests cover transitions, tree/Session mapping, concurrent writes, restart reads, corrupted data, and failed storage; they do not prove autonomous task planning or desktop rendering.

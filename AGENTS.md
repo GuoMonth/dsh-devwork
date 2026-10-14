@@ -18,6 +18,6 @@
 - Keep the alpha.2 declaration correction (retained from rc.2) narrow and development-only. Reassess it on an upstream upgrade; do not disable library checking.
 - Keep README.md/README.zh.md, docs/releasing.md/docs/releasing.zh.md, and locale/en.json/locale/zh.json in sync.
 - Keep user needs/feedback (kind:request) separate from implementation/maintenance (kind:development), using one category per issue. Link product development tasks to their requests. PRs close development tasks; close requests only when user acceptance is satisfied. Follow CONTRIBUTING.md.
-- Run npm run verify and npm pack --dry-run for package changes. Add behavioral tests when actual product behavior is introduced.
+- Run pnpm run verify and pnpm pack --dry-run for package changes. Add behavioral tests when actual product behavior is introduced.
 - Do not publish npm packages or tag a release without a user/maintainer request.
 - Never commit credentials, user DSH homes, generated lib output, node_modules, or local worktrees.

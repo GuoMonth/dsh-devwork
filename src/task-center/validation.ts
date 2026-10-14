@@ -1,0 +1,118 @@
+import { TaskDomainError } from './types.js'
+import type { TaskCommand, TaskEvent, TaskLog } from './types.js'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function record(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new TaskDomainError('Expected an object')
+  }
+  return value
+}
+
+function fields(value: Record<string, unknown>, names: readonly string[]): void {
+  for (const key of Object.keys(value)) {
+    if (!names.includes(key)) throw new TaskDomainError(`Unknown field: ${key}`)
+  }
+  for (const key of names) {
+    if (!Object.hasOwn(value, key)) throw new TaskDomainError(`Missing field: ${key}`)
+  }
+}
+
+function text(value: unknown): string {
+  if (typeof value !== 'string' || value.trim().length === 0) throw new TaskDomainError('Expected non-empty text')
+  return value
+}
+
+function nullableText(value: unknown): string | null {
+  return value === null ? null : text(value)
+}
+
+function textList(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new TaskDomainError('Expected a text array')
+  return value.map(text)
+}
+
+function choice<T extends string>(value: unknown, choices: readonly T[]): T {
+  for (const candidate of choices) if (value === candidate) return candidate
+  throw new TaskDomainError(`Expected one of: ${choices.join(', ')}`)
+}
+
+export function parseCommand(input: unknown): TaskCommand {
+  const value = record(input)
+  switch (value.type) {
+    case 'task.create':
+      fields(value, ['type', 'id', 'parentId', 'title', 'goal', 'scope', 'acceptance', 'dependencyIds'])
+      return { type: value.type, id: text(value.id), parentId: nullableText(value.parentId), title: text(value.title), goal: text(value.goal), scope: textList(value.scope), acceptance: textList(value.acceptance), dependencyIds: textList(value.dependencyIds) }
+    case 'task.reparent':
+      fields(value, ['type', 'taskId', 'parentId'])
+      return { type: value.type, taskId: text(value.taskId), parentId: nullableText(value.parentId) }
+    case 'task.transition':
+      fields(value, ['type', 'taskId', 'status'])
+      return { type: value.type, taskId: text(value.taskId), status: choice(value.status, ['pending', 'active', 'review', 'completed', 'cancelled']) }
+    case 'task.block':
+      fields(value, ['type', 'taskId', 'reason'])
+      return { type: value.type, taskId: text(value.taskId), reason: text(value.reason) }
+    case 'session.create':
+      fields(value, ['type', 'id', 'taskId', 'externalSessionId'])
+      return { type: value.type, id: text(value.id), taskId: text(value.taskId), externalSessionId: nullableText(value.externalSessionId) }
+    case 'attempt.start':
+      fields(value, ['type', 'id', 'sessionId', 'agentId'])
+      return { type: value.type, id: text(value.id), sessionId: text(value.sessionId), agentId: text(value.agentId) }
+    case 'attempt.transition':
+      fields(value, ['type', 'attemptId', 'status'])
+      return { type: value.type, attemptId: text(value.attemptId), status: choice(value.status, ['running', 'waiting', 'succeeded', 'failed', 'cancelled']) }
+    case 'artifact.create':
+      fields(value, ['type', 'id', 'taskId', 'attemptId', 'kind', 'uri'])
+      return { type: value.type, id: text(value.id), taskId: text(value.taskId), attemptId: nullableText(value.attemptId), kind: choice(value.kind, ['patch', 'commit', 'note', 'test_result']), uri: text(value.uri) }
+    case 'artifact.transition':
+      fields(value, ['type', 'artifactId', 'status'])
+      return { type: value.type, artifactId: text(value.artifactId), status: choice(value.status, ['draft', 'ready', 'accepted', 'superseded']) }
+    case 'integration.create': {
+      fields(value, ['type', 'id', 'taskId', 'artifactId', 'provider', 'url'])
+      const url = text(value.url)
+      const parsed = URL.parse(url)
+      if (parsed === null) throw new TaskDomainError('Expected a valid integration URL')
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new TaskDomainError('Expected an HTTPS integration URL without credentials')
+      return { type: value.type, id: text(value.id), taskId: text(value.taskId), artifactId: nullableText(value.artifactId), provider: choice(value.provider, ['github', 'gitlab']), url }
+    }
+    case 'integration.transition':
+      fields(value, ['type', 'integrationId', 'status'])
+      return { type: value.type, integrationId: text(value.integrationId), status: choice(value.status, ['draft', 'open', 'merged', 'closed']) }
+    case 'lease.reserve':
+      fields(value, ['type', 'id', 'taskId', 'path', 'kind'])
+      return { type: value.type, id: text(value.id), taskId: text(value.taskId), path: text(value.path), kind: choice(value.kind, ['existing', 'worktree']) }
+    case 'lease.activate':
+    case 'lease.release':
+      fields(value, ['type', 'leaseId'])
+      return { type: value.type, leaseId: text(value.leaseId) }
+    default:
+      throw new TaskDomainError('Unknown command type')
+  }
+}
+
+function list(value: unknown): unknown[] {
+  if (!Array.isArray(value)) throw new TaskDomainError('Expected an event array')
+  return value
+}
+
+export function parseEvent(input: unknown): TaskEvent {
+  const value = record(input)
+  fields(value, ['sequence', 'occurredAt', 'command'])
+  if (typeof value.sequence !== 'number' || !Number.isSafeInteger(value.sequence) || value.sequence < 1) {
+    throw new TaskDomainError('Expected a positive safe event sequence')
+  }
+  const occurredAt = text(value.occurredAt)
+  const time = Date.parse(occurredAt)
+  if (!Number.isFinite(time) || new Date(time).toISOString() !== occurredAt) throw new TaskDomainError('Expected an ISO event timestamp')
+  return { sequence: value.sequence, occurredAt, command: parseCommand(value.command) }
+}
+
+export function parseTaskLog(input: unknown): TaskLog {
+  const value = record(input)
+  fields(value, ['version', 'events'])
+  if (value.version !== 1) throw new TaskDomainError('Unsupported task log version')
+  return { version: 1, events: list(value.events).map(parseEvent) }
+}
