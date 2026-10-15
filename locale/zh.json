@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "DSH Devwork",
-    "description": "通过验证证据与集中审查组织本地开发。当前为 headless POC；真实模型与桌面验收待完成。"
+    "description": "以任务为中心的桌面开发，提供 Session 推进、验收证据、Artifact 和 PR/MR 交付。"
   },
   "taskPanel": {
     "panel": "任务",

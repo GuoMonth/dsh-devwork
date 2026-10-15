@@ -2,24 +2,24 @@
 
 [English](releasing.md) | 中文
 
-本项目是第三方 DSH bundle，不是 profile 或 DSH 官方发行版。仓库初始化不代表发布版本。
+这是第三方 DSH bundle，不是 profile，也不是 DSH 官方发行版。构建包不会自动发布版本。
 
-## 已采用的官方要求
+## 要求
 
 源码基线为 DSH `0.2.1-alpha.2`，提交 `d743267388641bc76f17c45ce8b4c231aed1d32c`。
 
 | 约定 | 项目配置 |
 | --- | --- |
-| npm bundle 声明 | `package.json` 声明 `dsh.bundle.patch`，不声明 `dsh.profile` |
-| 可解析的插件行 | `cordis.patch.yml` 插入发布后的包名 |
-| Cordis 入口 | `src/index.ts` 导出 `name` 与 `apply(ctx)` |
-| 共享运行时实例 | Cordis 同时为 peer 与开发依赖，不打入运行时代码 |
-| 预构建分发 | `prepack` 构建 JavaScript/类型声明，`files` 包含 patch 和资源 |
-| Git 源码安装 | `prepare` 独立构建，不需要 DSH 源码仓库 |
-| 插件发现 | npm 关键词 `dsh-plugin`；GitHub 仓库添加 `dsh-plugin` topic |
-| 插件列表元数据 | `icon` 与 `locale/en.json`、`locale/zh.json` 的 `meta.title`/`meta.description` |
+| npm bundle 清单 | `package.json` 声明 `dsh.bundle.patch`，不声明 `dsh.profile` |
+| 可解析的插件行 | `cordis.patch.yml` 插入发布包名 |
+| Cordis 入口 | `src/index.ts` 导出 `name` 和 `apply(ctx)` |
+| 共享运行时身份 | Cordis 同时是 peer 和开发依赖，不打包另一份运行时 |
+| 预构建分发 | `prepack` 构建 JavaScript/声明文件，`files` 包含 patch 和资源 |
+| Git 源码安装 | `prepare` 可脱离 DSH 源码仓库独立构建 |
+| 插件发现 | npm `dsh-plugin` 关键词，并为 GitHub 仓库添加 `dsh-plugin` topic |
+| 插件元数据 | `icon` 以及 `locale/en.json`、`locale/zh.json` 提供 `meta.title`/`meta.description` |
 
-图标和语言文件约定参考官方 Agent Teams bundle。中英文项目文档是本项目的选择；上游翻译追踪文件不是外部插件的安装要求。
+任务中心 API 是唯一产品入口。旧 Round/Leader API、数据模型和兼容层有意不再进入包。
 
 ## 验证
 
@@ -30,40 +30,19 @@ pnpm run pack:check
 pnpm pack --dry-run
 ```
 
-这些检查覆盖严格 Host/Client/脚本/测试类型、headless 行为场景、Client 边界场景、入口、bundle 元数据，以及独立消费项目安装和导入预构建 tarball。Client 使用官方 closure-factory loader 和公开会话 slot。精确的 alpha.2 声明修正仅用于开发、不进入发布包，见 [POC 评估](headless-poc.zh.md)。这些检查不证明桌面交互或模型任务已可用。真正发布前，在目标 DSH 桌面端安装 tarball、启用/禁用插件，并验证所有对外宣称的功能。更换 DSH 基线后重新检查兼容性。
+这些检查覆盖严格 Host/Client/脚本/测试类型、任务中心领域与 Host 桥接行为、Client 边界、公开导出、bundle 元数据，以及独立消费项目导入预构建 tarball。测试使用 mock Provider，不证明真实 Provider 调用、模型规划、权限界面或原生桌面交互。正式发布前，应在目标 DSH 桌面端安装 tarball，验证任务面板、Session 操作、Artifact/PR 查看和用户授权流程。更换 DSH 基线后重新检查公开 API。
 
-累计审查 Host API 要求派发工作前等待 `open` 完成，并用返回的自有审查标识调用 `reviewDiff` 和反馈。发布验证需覆盖替换打开失败后恢复旧基线并清空证据、多 turn 起点到当前的改动、排除未变化的已有 dirty/未跟踪内容、已暂存/已提交删除、文本/文件反馈、代码过期与目录变化失效，以及原有权限/worktree 保护。用缺失、过期、漏报和截断的官方 summary 检查独立的覆盖文件列表；测试通过不代表上游快照 issue #7 已解决。保留 [POC 评估](headless-poc.zh.md#已实现的接口) 中的有界采集上限和不支持情形。不要把本次 Host 工作宣传成新的桌面审查 UI、真实模型验证或重启恢复；测试结果只能在发布候选版本实际执行命令后记录。
+alpha.2 声明修正仍仅用于开发，由 `scripts/prepare-types.mts` 负责版本守卫，不会进入发布包。上游声明变化时重新评估，并保持库检查开启。
 
 ## GitHub alpha 发布
 
-1. 选择 `x.y.z-alpha.N` 版本，更新 `package.json` 和锁文件，在 `CHANGELOG.md` 记录实际变化。
-2. 执行上述检查并审查 CI。
-3. 收到发布请求后，为已审查的 main 提交打 `v<version>` 标签并推送。
+1. 选择 `x.y.z-alpha.N` 版本，更新 `package.json` 及锁文件，在 `CHANGELOG.md` 记录实际改动。
+2. 执行上面的检查并审查 CI。
+3. 只有在明确收到发布请求后，才将审查过的 main 提交标记为 `v<version>` 并推送。
 
-alpha 工作流拒绝版本不一致的标签，重新检查包，生成包含预构建 `.tgz` 和 `SHA256SUMS` 的 GitHub 预发布，不发布 npm。稳定版需要另行审查工作流和标签规则。
+alpha workflow 构建 tarball 并创建 GitHub prerelease。npm 发布仍需维护者单独、明确执行。
 
-## npm 发布
+## 参考
 
-沿用维护者命名空间 `@guosheng_047`。发布前确认 npm 身份、命名空间发布权限和首次发布的包名可用性。使用正常 npm 认证方式，凭据不写入仓库。
-
-```sh
-pnpm whoami
-pnpm publish --access public --tag alpha
-```
-
-`prepublishOnly` 检查包，`prepack` 执行构建。不要把 alpha POC推到 `latest`。本骨架没有配置 GitHub Actions trusted publishing；它需要 npm 侧设置及明确的发布策略。
-
-发布 npm 后，用户可以在桌面端插件页面安装 `@guosheng_047/dsh-devwork@alpha`，也可以执行：
-
-```sh
-dsh plugin --profile devwork-demo add @guosheng_047/dsh-devwork@alpha
-```
-
-发布 npm 前，以预构建 tarball 或本地目录试装。Git 源码安装需要在 pnpm 中显式允许这个包的 `prepare` 构建；按照 pnpm 诊断中的精确包名配置，并固定源码提交。tarball/npm 使用已构建产物，不需要这一构建许可。
-
-## 一手参考
-
-- [官方打包与安装教程](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/docs/user/develop/basic/publish.zh.md)
-- [官方插件入口教程](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/docs/user/develop/basic/index.zh.md)
-- [官方 Agent Teams bundle 元数据](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/packages/experimental/agent-team-profile/package.json)
-- [官方插件发现说明](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/README.md#community-and-support)
+- [DSH bundle 元数据](https://github.com/deepseek-ai/deepseek-harness/blob/d743267388641bc76f17c45ce8b4c231aed1d32c/packages/bundle/agent-team-profile/package.json)
+- [DSH 插件开发](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)

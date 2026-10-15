@@ -1,5 +1,9 @@
 import type { WorkspaceEntry, WorkspaceManifest } from './workspace.js'
-import type { ReviewFileDiff, ReviewSide } from './types.js'
+
+export type ReviewSide = { kind: 'absent' } | { kind: 'file'; mode: number; bytes: number } | { kind: 'symlink'; target: string }
+export type ReviewFileDiff = { path: string; before: ReviewSide; after: ReviewSide } & (
+  { kind: 'text'; coarse: true; oldText: string; newText: string } | { kind: 'metadata' }
+)
 
 function side(entry: WorkspaceEntry | undefined): ReviewSide {
   if (entry === undefined) return { kind: 'absent' }

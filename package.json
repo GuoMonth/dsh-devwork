@@ -1,7 +1,7 @@
 {
   "name": "@guosheng_047/dsh-devwork",
   "version": "0.1.0-alpha.0",
-  "description": "Local development rounds, verification evidence and consolidated review for DeepSeek Harness \u2014 headless POC",
+  "description": "Task-centered desktop development with Session progress, acceptance evidence, Artifacts and PR/MR delivery for DeepSeek Harness",
   "type": "module",
   "license": "MIT",
   "author": "GuoMonth",
@@ -85,24 +85,16 @@
     "test:unit": "node --test tests/unit/*.mts",
     "test:component": "node --test tests/client.mts",
     "test:integration:mock": "node --test tests/integration/*.mts",
-    "test:integration:contract": "node --test tests/headless.mts",
+    "test:integration:contract": "node --test tests/entrypoints.mts",
     "test:e2e": "node --test tests/e2e/*.mts"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.5-alpha.1",
-    "@deepseek-ai/dsh-agent": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-locale": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-conversation": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.1-alpha.2",
-    "@deepseek-ai/dsh-experimental-agent-team": "0.2.1-alpha.2",
-    "@deepseek-ai/dsh-llm": "0.2.1-alpha.2",
-    "@deepseek-ai/dsh-session": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-subprocess": "0.2.1-alpha.2",
-    "@deepseek-ai/dsh-system-prompt": "0.2.1-alpha.2",
-    "@deepseek-ai/dsh-tools": "0.2.1-alpha.2",
-    "@deepseek-ai/dsh-working-directory": "0.2.1-alpha.2",
-    "@deepseek-ai/dsh-workspace-changes": "0.2.1-alpha.2",
     "react": "^18.2.0"
   },
   "devDependencies": {

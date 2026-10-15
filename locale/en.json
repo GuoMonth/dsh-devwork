@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "DSH Devwork",
-    "description": "Local development rounds with verification evidence and consolidated review. Headless POC; real-model and desktop acceptance pending."
+    "description": "Task-centered desktop development with Session progress, acceptance evidence, Artifacts and PR/MR delivery."
   },
   "taskPanel": {
     "panel": "Tasks",

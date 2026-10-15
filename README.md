@@ -2,25 +2,26 @@
 
 English | [中文](README.zh.md)
 
-A task-centered desktop development workspace built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Define work as tasks, follow their Session tree, and review outputs in one place.
+A task-centered desktop development workspace built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Define work as tasks, follow their Session tree, and inspect acceptance evidence, Artifacts and PR/MR delivery from the same conversation.
 
-**Status: task-center Host bridge implemented with mock coverage; native desktop acceptance remains open.** The [domain model](docs/task-center.md) provides task/Session relationships, independent lifecycle states, a task-tree projection, a local event log, deterministic nested task intake, and mockable single-executor execution. `TaskPanelHost` now injects a Session-scoped public source backed by the shared durable repository, execution engine and delivery service. No provider configuration means an explicit unavailable state, and mock tests do not claim real desktop or provider acceptance. The old headless POC remains temporarily wired for regression coverage; its scripted-model tests do not prove autonomous planning or desktop rendering. No npm release has been published.
+**Status: the task-center Host bridge is implemented with mock coverage; native desktop acceptance remains open.** `TaskPanelHost` owns the durable task projection, execution engine and delivery service, and exposes one Session-scoped `taskPanelSource` to the Client panel. Provider and planner dependencies are explicit: without them the source reports `unavailable` instead of creating mock state. Mock tests describe deterministic service behavior and do not claim real desktop, provider or model acceptance. No npm release has been published.
 
-## Direction
+## Product model
 
-- Keep DSH's conversation, tools, permissions, and plugin habits.
-- Give each task one primary Session; decomposition mirrors the Session tree, and retries add Attempts within that Session.
-- Track progress, blocked reasons, acceptance and durable Artifacts; PR/MR merge requires user authorization.
-- Make code review and batched feedback part of the same development flow.
-- Learn from Orca's developer experience and implement independently in DSH; no Orca code or runtime dependency.
+- A task is the durable unit of work and has one primary Session.
+- Parent and child tasks form the Session tree; retries create Attempts under the same Session.
+- Acceptance criteria, execution results, Artifacts, workspace leases and PR/MR integrations have independent persisted state.
+- Merge requires a current, user-authorized handoff. Cleanup runs only after ownership, delivery, acceptance and workspace checks succeed.
+- The Host owns task state. Client views subscribe to the same projection and do not create a second store.
+- The first phase uses one active executor. Remote execution, mobile clients, email and automatic crash recovery remain outside the product boundary.
 
-The first phase focuses on local desktop development with one active executor. Product multi-agent collaboration, remote execution, mobile clients, email, and automatic crash recovery are deferred. This rewrite promises no compatibility with the old Round API or data.
+The old Round/Leader POC entry points, data model and compatibility layer have been removed. This alpha is a breaking task-center transition; consumers must use the public task-center APIs.
 
-The [headless POC assessment](docs/headless-poc.md) records the implementation, lifecycle findings, results and blockers. We reuse official tasks and members, gate delivery on current acceptance evidence, and send several diff comments as one follow-up to the same Leader. Temporary task worktrees now support a [committed Leader handoff and cleanup](docs/task-delivery.md). The UI currently provides an editable start request; a result/feedback surface remains to be built. See also the earlier [phase-one assessment](docs/phase-one.md).
+See the [task-center domain model](docs/task-center.md) for the persisted states and Host/Client boundary.
 
 ## Develop and try the bundle
 
-Baseline: DSH **0.2.1-alpha.2**, Cordis **4.0.5-alpha.1**. Use **Node.js 24.x only** and **pnpm 12.11.2**; the Node minor/patch version is not fixed. CI and releases use Node 24. All source and development scripts use **strict TypeScript 7.0.2**, with unchecked indexed access and exact optional property checks enabled.
+Baseline: DSH **0.2.1-alpha.2**, Cordis **4.0.5-alpha.1**. Use **Node.js 24.x only** and **pnpm 12.11.2**. Source and development scripts use strict TypeScript 7.0.2.
 
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git
@@ -31,28 +32,24 @@ pnpm run pack:check
 pnpm pack
 ```
 
-In the DSH desktop Plugins page, use the local package directory as an installation source. Enable Devwork and the official opt-in Agent Teams bundle. The Host also needs official tools, a Bash provider, system prompt, workspace-changes, and working-directory. Missing services leave Devwork pending. The input action inserts an editable request and never submits it automatically. For CLI validation with an installed DSH CLI, from the directory above the checkout:
+In the DSH desktop Plugins page, install the local package directory and enable Devwork. The Client entry inserts an editable task request and never submits it automatically. The Host must supply a task repository plus explicit Session/Agent providers before creation and execution are available; a missing configuration remains visibly unavailable.
+
+For CLI package validation with an installed DSH CLI, from the directory above the checkout:
 
 ```sh
 dsh plugin --profile devwork-demo add ./dsh-devwork
 dsh --profile devwork-demo --dump-config
 ```
 
-The output should include the Devwork bundle layer and the `guomonth-devwork` row. This CLI profile is an installation check, not a separate desktop application.
+The output should include the Devwork bundle layer and the `guomonth-devwork` row. This profile checks installation metadata; it is not a separate desktop application.
 
-The test suite checks the Host bridge, mock delivery/execution and Client registration/insertion without a browser. The real-model, permission UI, provider and native desktop acceptance checks remain open. DSH alpha.2 retains a public declaration composition defect; our exact, development-only correction is documented in the [POC assessment](docs/headless-poc.md#blockers-and-limits).
-
-Host review captures its own bounded, actual-content baseline when the asynchronous `open` completes. Await it before dispatching coding work. Review compares that baseline with the current checkout across turns, including staged/committed changes and deletions while excluding unchanged preexisting dirty/untracked content. A lazy per-file `reviewDiff` exposes coarse text comparisons or file metadata; feedback supports current-side text lines and whole-file comments for deletions, binary files, executable-mode changes and symlinks.
-
-Each round keeps a fixed `integrationRoot` at the Leader’s original Session directory. The current official working directory must match it. Changing directories keeps the start baseline but clears acceptance evidence, current review and feedback, even after switching back; verify and capture a new review after restoration. Devwork never switches the Leader automatically. Member tools must still receive explicit task-worktree paths.
-
-Official alpha.2 upgrade findings: [assessment](docs/upstream-alpha-assessment.md). Same-second equal-size official snapshot misses remain unresolved in [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7). Official summaries are supplemental, never proof of coverage; their omissions or truncation cannot hide changes in Devwork’s own covered content. This is independent Host review, not an upstream repair. Capture uses two matching reads without retries or an external-writer lock, with limits of 10,000 paths, 8 MiB per file and 64 MiB total. Newly ignored-only paths are excluded; submodule directories refuse capture rather than being silently skipped. Baseline paths remain covered. See the [POC boundaries](docs/headless-poc.md#interfaces).
+The test suite covers task state transitions, Session-scoped Host actions, execution cancellation, durable Artifact and delivery state, cleanup guards, Client registration and panel rendering without a browser. Real provider calls, permission UI, model judgment and native desktop interaction remain final E2E work.
 
 ## Package and release
 
-Package: `@guosheng_047/dsh-devwork`. It is a DSH **bundle** with `dsh.bundle.patch`, not a profile. Shared Host APIs are peers; built JavaScript, declarations, patch, icon, and locales are included in the npm tarball.
+Package: `@guosheng_047/dsh-devwork`. It is a DSH **bundle** with `dsh.bundle.patch`, not a profile. Shared Host APIs are peers; built JavaScript, declarations, patch, icon and locales are included in the npm tarball.
 
-See [release instructions](docs/releasing.md) and [contributing](CONTRIBUTING.md). GitHub alpha tags package a prerelease tarball; npm publishing is a separate, explicit maintainer action.
+See [release instructions](docs/releasing.md) and [contributing](CONTRIBUTING.md). Publishing and tagging require an explicit maintainer request.
 
 ## References
 

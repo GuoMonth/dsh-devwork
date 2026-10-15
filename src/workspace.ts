@@ -23,13 +23,13 @@ async function capture(cwd: string, signal: AbortSignal, retainedPaths: readonly
   const options = { cwd, signal, env: { ...scrubbedParentEnv(), GIT_CONFIG_COUNT: '0' }, maxBuffer: 4 * 1024 * 1024, timeout: 10_000 }
   const { stdout: rootOutput } = await run('git', ['rev-parse', '--show-toplevel'], options)
   const root = rootOutput.trim()
-  if (resolve(cwd) !== resolve(root) || await realpath(cwd) !== resolve(cwd)) throw new Error('The POC requires cwd to be the canonical Git repository root')
+  if (resolve(cwd) !== resolve(root) || await realpath(cwd) !== resolve(cwd)) throw new Error('Workspace capture requires cwd to be the canonical Git repository root')
   const { stdout, stderr } = await run('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { ...options, encoding: 'buffer' })
   if (stderr.length) throw new Error('Git could not establish complete workspace path coverage')
   const names = stdout.toString('utf8')
   if (!Buffer.from(names).equals(stdout)) throw new Error('Workspace filenames must be lossless UTF-8')
   const paths = [...new Set([...names.split('\0').filter(Boolean), ...retainedPaths])].sort()
-  if (paths.length > MAX_FILES) throw new Error('Workspace exceeds the POC file limit')
+  if (paths.length > MAX_FILES) throw new Error('Workspace exceeds the file limit')
   const entries = new Map<string, WorkspaceEntry>()
   const hash = createHash('sha256')
   let bytes = 0
@@ -52,8 +52,8 @@ async function capture(cwd: string, signal: AbortSignal, retainedPaths: readonly
         bytes += Buffer.byteLength(target)
         entry = { kind: 'symlink', target }
       } else if (stat.isFile()) {
-        if (stat.size > MAX_FILE_BYTES) throw new Error(`File exceeds the POC size limit: ${path}`)
-        if (bytes + stat.size > MAX_TOTAL_BYTES) throw new Error('Workspace exceeds the POC byte limit')
+        if (stat.size > MAX_FILE_BYTES) throw new Error(`File exceeds the size limit: ${path}`)
+        if (bytes + stat.size > MAX_TOTAL_BYTES) throw new Error('Workspace exceeds the byte limit')
         const handle = await open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW)
         try {
           const opened = await handle.stat()
@@ -66,7 +66,7 @@ async function capture(cwd: string, signal: AbortSignal, retainedPaths: readonly
             if (read.bytesRead === 0) break
             length += read.bytesRead
           }
-          if (length > MAX_FILE_BYTES) throw new Error(`File exceeds the POC size limit: ${path}`)
+          if (length > MAX_FILE_BYTES) throw new Error(`File exceeds the size limit: ${path}`)
           const after = await handle.stat()
           if (after.size !== length || after.mtimeMs !== opened.mtimeMs || after.ctimeMs !== opened.ctimeMs) throw new Error(`Workspace changed while reading: ${path}`)
           const content = Buffer.from(buffer.subarray(0, length))
@@ -74,7 +74,7 @@ async function capture(cwd: string, signal: AbortSignal, retainedPaths: readonly
           entry = { kind: 'file', mode: after.mode & 0o111, bytes: content }
         } finally { await handle.close() }
       } else throw new Error(`Unsupported workspace entry: ${path}`)
-      if (bytes > MAX_TOTAL_BYTES) throw new Error('Workspace exceeds the POC byte limit')
+      if (bytes > MAX_TOTAL_BYTES) throw new Error('Workspace exceeds the byte limit')
       entries.set(path, entry)
       hash.update(`${Buffer.byteLength(path)}:${path}:`)
       if (entry.kind === 'file') hash.update(`file:${entry.mode}:${entry.bytes.length}:`).update(entry.bytes)

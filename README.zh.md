@@ -2,25 +2,26 @@
 
 [English](README.md) | 中文
 
-基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的任务中心桌面开发工作台。以任务定义工作，通过 Session 树跟踪推进，在同一个地方查看和审查产出。
+基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的任务中心桌面开发工作台。以任务定义工作，通过 Session 树跟踪推进，在同一会话中查看验收证据、Artifact 和 PR/MR 交付。
 
-**当前状态：任务中心 Host 桥接已实现并有 mock 覆盖；原生桌面验收仍待完成。** [领域模型](docs/task-center.zh.md) 已提供任务与 Session 关系、独立生命周期状态、任务树投影、本地事件日志、确定性的嵌套任务接入和可 mock 的单执行者执行。`TaskPanelHost` 现在通过共享持久化仓库、执行引擎和交付服务注入按 Session 绑定的公开 source。没有 Provider 配置时明确显示 unavailable，mock 测试不冒充真实桌面或 Provider 验收。旧 headless POC 暂时保留接线用于回归验证；其脚本模型测试不证明自主规划或桌面渲染。目前没有发布 npm 版本。
+**当前状态：任务中心 Host 桥接已实现并有 mock 覆盖；原生桌面验收仍待完成。** `TaskPanelHost` 持有持久化任务投影、执行引擎和交付服务，并向 Client 面板提供按 Session 绑定的公开 `taskPanelSource`。Provider 和 planner 均需显式配置；缺少配置时 source 明确显示 `unavailable`，不会构造 mock 状态。mock 测试只说明确定性的服务行为，不代表真实桌面、Provider 或模型验收。目前没有发布 npm 版本。
 
-## 产品方向
+## 产品模型
 
-- 保留 DSH 的会话、工具、权限和插件使用习惯。
-- 每个任务只有一个主 Session；任务分解对应 Session 树，重试在同一 Session 下增加 Attempt。
-- 跟踪推进、阻塞原因、验收与持久化 Artifact；合并 PR/MR 需要用户授权。
-- 将代码审查和一次性反馈融入同一条开发路径。
-- 吸收 Orca 的开发者体验，在 DSH 中独立实现；不依赖 Orca 的代码或运行时。
+- 任务是持久化工作单位，每个任务只有一个主 Session。
+- 父子任务组成 Session 树；重试在同一 Session 下创建 Attempt。
+- 验收条件、执行结果、Artifact、工作区租约和 PR/MR 集成拥有独立的持久化状态。
+- 合并必须经过当前版本和用户授权的交接；只有所有权、交付、验收和工作区检查成功后才清理。
+- Host 持有任务事实状态；Client 面板和 Session 视图订阅同一投影，不创建第二套存储。
+- 第一阶段使用一个活跃执行者；远程执行、手机客户端、邮件和崩溃自动恢复不在产品边界内。
 
-第一阶段聚焦本地桌面开发，仅一个活跃执行者。产品内多 Agent 协作、远程执行、手机客户端、邮件和崩溃自动恢复暂缓。此次重构不承诺旧 Round API 或数据兼容。
+旧 Round/Leader POC 的入口、数据模型和兼容层已经删除。这是一次破坏性的任务中心迁移；使用方应改用公开的任务中心 API。
 
-参见[headless POC 评估](docs/headless-poc.zh.md)，包含实现、生命周期发现、验证结果与阻塞点。复用官方任务和成员，以当前代码的验收证据约束交付，把多个 diff 评论作为一条消息交回同一个 Leader。临时任务 worktree 已支持[提交 Leader 摘要后的交付清理](docs/task-delivery.zh.md)。UI 目前提供可编辑的启动请求，成果和反馈界面仍待实现。另见早期的[第一阶段评估](docs/phase-one.zh.md)。
+参见[任务中心领域模型](docs/task-center.zh.md)了解持久化状态和 Host/Client 边界。
 
 ## 开发与试装
 
-兼容基线：DSH **0.2.1-alpha.2**，Cordis **4.0.5-alpha.1**。仅支持 **Node.js 24.x**，使用 **pnpm 12.11.2**，不锁定 Node 小版本和补丁版本；CI 与发布流程统一使用 Node 24。源码和开发脚本均采用**严格 TypeScript 7.0.2**，并启用索引访问与可选属性的额外检查。
+基线为 DSH **0.2.1-alpha.2**、Cordis **4.0.5-alpha.1**。仅支持 **Node.js 24.x**，使用 **pnpm 12.11.2**。源码和开发脚本均采用严格 TypeScript 7.0.2。
 
 ```sh
 git clone https://github.com/GuoMonth/dsh-devwork.git
@@ -31,28 +32,24 @@ pnpm run pack:check
 pnpm pack
 ```
 
-在 DSH 桌面端「插件」页面，以本地包目录试装，开启 Devwork 和官方显式启用的 Agent Teams bundle。Host 还需要官方 tools、Bash provider、system prompt、workspace-changes 和 working-directory；依赖缺失时 Devwork 保持 pending。输入区入口只插入可编辑请求，不自动发送。也可以在已安装 DSH CLI 的环境里，从仓库的上级目录验证安装：
+在 DSH 桌面端插件页面安装本地包并启用 Devwork。Client 入口只插入可编辑的任务请求，不会自动提交。Host 必须显式提供任务仓库和 Session/Agent Provider，任务创建与执行才可用；缺少配置时持续显示不可用状态。
+
+使用已安装的 DSH CLI 验证包安装元数据（在仓库上级目录执行）：
 
 ```sh
 dsh plugin --profile devwork-demo add ./dsh-devwork
 dsh --profile devwork-demo --dump-config
 ```
 
-输出应包含 Devwork 的 bundle 层和 `guomonth-devwork` 插件行。这个 CLI profile 仅用于验证安装，不是独立桌面应用。
+输出应包含 Devwork bundle 层和 `guomonth-devwork` 行。这个 profile 只检查安装元数据，不是独立桌面应用。
 
-测试无需浏览器，覆盖 Host 桥接、mock 交付/执行及 Client 注册、文本插入。真实模型、权限界面、Provider 和原生桌面验收仍待完成。DSH alpha.2 仍保留公开声明组合类型缺陷，精确、仅开发期的修正在 [POC 评估](docs/headless-poc.zh.md) 中说明。
-
-Host 审查在异步 `open` 完成时取得自有、有界的实际内容基线；开始派发开发工作前必须等待它完成。审查跨 turn 比较起点与当前 checkout，包含已暂存/已提交的改动和删除，排除未再变化的已有 dirty/未跟踪内容。按文件延迟调用的 `reviewDiff` 提供粗粒度文本比较或文件元数据；反馈支持当前侧文本行，以及删除、二进制、可执行位变化和符号链接的整文件评论。
-
-每个回合的 `integrationRoot` 固定在 Leader 原始 Session 目录，并要求官方当前工作目录与之相同。切换目录保留起点基线，但清空验收证据、当前审查和反馈，即使切回也不会恢复；恢复后需重新验收并采集审查。Devwork 不自动切换 Leader，成员工具仍需显式传入任务 worktree 路径。
-
-官方 alpha.2 升级核查见[评估](docs/upstream-alpha-assessment.zh.md)。官方快照同秒等长漏报仍由 [issue #7](https://github.com/GuoMonth/dsh-devwork/issues/7) 跟踪，尚未解决。官方 summary 仅作补充，不证明覆盖完整；其漏报或截断不会隐藏 Devwork 自有范围内的内容变化。这是独立的 Host 审查，并非上游修复。采集要求两次读取一致，不自动重试，也不锁定外部写入；上限为 10,000 路径、单文件 8 MiB、总计 64 MiB。新增且仅 ignored 的路径不纳入；遇到 submodule 目录时拒绝采集，不静默跳过。基线路径持续覆盖。详见 [POC 边界](docs/headless-poc.zh.md#已实现的接口)。
+测试无需浏览器，覆盖任务状态转换、Session 绑定的 Host 操作、执行取消、持久化 Artifact 与交付状态、清理保护、Client 注册和面板渲染。真实 Provider 调用、权限界面、模型判断和原生桌面交互留给最终 E2E 验收。
 
 ## 打包与发布
 
-包名：`@guosheng_047/dsh-devwork`。它通过 `dsh.bundle.patch` 声明为 DSH **bundle**，不声明 profile。共享的 Host API 使用 peer 依赖；npm 包包含编译后的 JavaScript、类型声明、patch、图标和语言文件。
+包名：`@guosheng_047/dsh-devwork`。它通过 `dsh.bundle.patch` 声明为 DSH **bundle**，不声明 profile。共享 Host API 使用 peer 依赖；npm 包包含编译后的 JavaScript、类型声明、patch、图标和语言文件。
 
-参见[发布说明](docs/releasing.zh.md)和[贡献指南](CONTRIBUTING.md)。GitHub alpha 标签会生成预发布 tarball；npm 发布由维护者单独、明确执行。
+参见[发布说明](docs/releasing.zh.md)和[贡献指南](CONTRIBUTING.md)。发布和打标签需要维护者明确请求。
 
 ## 官方参考
 
